@@ -17,7 +17,7 @@ extern crate test;
 
 
 #[pymodule]
-fn rws(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<server::Server>()?;
     Ok(())
 }
