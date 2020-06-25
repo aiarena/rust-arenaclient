@@ -1,0 +1,38 @@
+[package]
+name = "rws"
+version = "0.1.0"
+authors = ["Daniel <danielvanschoor1997@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "rws"
+crate-type = ["cdylib"]
+
+[dependencies]
+websocket = "*"
+tungstenite = "*"
+sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
+protobuf = { version = "*", features = ["with-bytes"] }
+log = "0.4"
+shellexpand = "1.0"
+regex = "1.1.0"
+portpicker  = "0.1"
+tempfile = "3"
+crossbeam = "0.7.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "*"
+
+[dependencies.pyo3]
+version = "0.10.1"
+features = ["extension-module"]
+
+
+[profile.release]
+opt-level = 3
+debug=false
+panic="abort"
+lto = "fat"
+codegen-units = 1
+
