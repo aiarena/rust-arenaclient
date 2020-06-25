@@ -182,6 +182,7 @@ impl GameLobby {
 }
 
 /// Used to pass player setup info to CreateGame
+#[allow(dead_code)]
 enum CreateGamePlayer {
     Participant,
     Computer(Race, Difficulty),
