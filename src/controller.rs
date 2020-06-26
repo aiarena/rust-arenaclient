@@ -13,9 +13,7 @@ use websocket::result::WebSocketError;
 use protobuf::parse_from_bytes;
 
 use crate::config::Config;
-use crate::game::{
-spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle,
-};
+use crate::game::{spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle};
 use crate::proxy::Client;
 use crate::result::JsonResult;
 use protobuf::Message;
@@ -354,12 +352,12 @@ impl Controller {
                 Ok((result, players)) => {
                     let average_frame_time: Option<HashMap<String, f32>>;
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-                    for p in players.into_iter(){
+                    for p in players.into_iter() {
                         avg_hash.insert(p.player_name().unwrap(), p.frame_time);
                     }
                     average_frame_time = Some(avg_hash);
                     let player_results = result.player_results;
-                    
+
                     let p1 = self.config.clone().unwrap().clone().player1();
                     let p2 = self.config.clone().unwrap().clone().player2();
                     let mut game_result = HashMap::with_capacity(2);

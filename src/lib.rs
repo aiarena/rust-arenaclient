@@ -15,7 +15,6 @@ mod sc2process;
 pub mod server;
 extern crate test;
 
-
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<server::Server>()?;
