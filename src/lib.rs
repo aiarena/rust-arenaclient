@@ -25,11 +25,11 @@ fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::server::Server;
+    use crate::server::RustServer;
 
     #[test]
     fn test_server() {
-        let server = Server::new("127.0.0.1:8642");
+        let server = RustServer::new("127.0.0.1:8642");
         let t = server.run();
         t.join().unwrap();
         assert_eq!(1, 1);

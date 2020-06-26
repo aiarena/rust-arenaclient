@@ -3,33 +3,29 @@ use crossbeam::channel::{self, TryRecvError};
 // use std::env::var;
 // use std::fs::File;
 // use std::io::prelude::*;
+use bincode::{deserialize, serialize};
+use serde::{Deserialize, Serialize};
 use crate::controller::Controller;
 use crate::proxy;
 use pyo3::prelude::*;
 use std::thread;
 use std::thread::JoinHandle;
+use pyo3::types::PyBytes;
+use pyo3::ToPyObject;
+
 pub enum ClientType {
     Bot,
     Controller,
 }
-#[pyclass]
-pub struct Server {
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct RustServer {
     ip_addr: String,
 }
-#[pymethods]
-impl Server {
-    #[new]
-    fn py_new(ip_addr: &str) -> Self {
-        Self::new(ip_addr)
-    }
-    fn py_run(&self) -> bool {
-        self.run().join().is_ok()
-    }
-}
 
-impl Server {
+impl RustServer {
     pub fn new(ip_addr: &str) -> Self {
-        Server {
+        RustServer {
             ip_addr: String::from(ip_addr),
         }
     }
@@ -62,4 +58,38 @@ impl Server {
             thread::sleep(::std::time::Duration::from_millis(100));
         })
     }
+}
+#[pyclass(module="rust_ac")]
+pub(crate) struct Server {
+    server: RustServer
+}
+
+#[pymethods]
+impl Server {
+    #[new]
+    fn new(addr: &str) -> Self {
+        Server{
+               server: RustServer::new(addr)
+
+        }
+    }
+
+    pub fn run(&self)->bool{
+        self.server.run().join().is_ok()
+    }
+
+    pub fn __setstate__(&mut self, py: Python, state: PyObject) -> PyResult<()> {
+        match state.extract::<&PyBytes>(py) {
+            Ok(s) => {
+                self.server = deserialize(s.as_bytes()).unwrap();
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn __getstate__(&self, py: Python) -> PyResult<PyObject> {
+        Ok(PyBytes::new(py, &serialize(&self.server).unwrap()).to_object(py))
+    }
+
 }
