@@ -11,6 +11,11 @@ Cargo.lock
 
 # VSCode files
 launch.json
+settings.json
 
-#IDEA files
+# IDEA files
 .idea
+
+# Python files
+*.pyc
+*.pyd

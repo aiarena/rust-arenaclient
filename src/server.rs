@@ -60,12 +60,12 @@ impl RustServer {
     }
 }
 #[pyclass(module = "rust_ac")]
-pub(crate) struct Server {
+pub(crate) struct PServer {
     server: Option<RustServer>,
 }
 
 #[pymethods]
-impl Server {
+impl PServer {
     #[new]
     #[args(args = "*")]
     fn new(args: &PyTuple) -> Self {
