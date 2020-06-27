@@ -16,7 +16,9 @@ image: "rust:latest"
 before_script:
  - apt-get update -yqq
  - apt-get install -yqq --no-install-recommends python3.7
- - pip3.7 install maturin
+ - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+ - python3.7 get-pip.py
+ - pip3 install maturin
 
 # Use cargo to test the project
 #test:cargo:
