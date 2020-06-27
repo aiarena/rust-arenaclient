@@ -13,27 +13,12 @@ image: "konstin2/maturin:latest"
 
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
-#before_script:
-# - yum install xz -y
-# - cd /usr/src
-# - curl -o Python-3.7.7.tar.xz https://www.python.org/ftp/python/3.7.7/Python-3.7.7.tar.xz
-# - unxz Python-3.7.7.tar.xz
-# - tar -xvf Python-3.7.7.tar
-# - cd Python-3.7.7
-# - yum install gcc -y
-# - yum install openssl-devel -y
-# - ./configure --prefix=/opt/python3
-# - make altinstall
-# - ln -s /opt/python3/bin/python3.7 /usr/bin/python3.7
-# - python3.7 --version
-# - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-# - python3.7 get-pip.py
-# - pip3 install maturin
-# - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
-# - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
-# - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-# - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
-# - rm -f $PROTOC_ZIP
+before_script:
+ - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
+ - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
+ - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+ - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+ - rm -f $PROTOC_ZIP
 #
 ## Use cargo to test the project
 ##test:cargo:
@@ -41,9 +26,9 @@ image: "konstin2/maturin:latest"
 ##    - rustc --version && cargo --version  # Print version info for debugging
 ##    - cargo test --workspace --verbose
 #
-#build:
-# script:
-#  - maturin build --release
-# artifacts:
-#  paths:
-#   - "*/target/wheels/*.whl"
+build:
+ script:
+  - maturin build --release
+ artifacts:
+  paths:
+   - "*/target/wheels/*.whl"
