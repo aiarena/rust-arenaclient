@@ -22,6 +22,8 @@ before_script:
  - apt-get install -yqq --no-install-recommends python3-distutils
  - apt-get install -yqq --no-install-recommends python3-apt
  - apt-get install -yqq --no-install-recommends unzip
+ - apt-get install -yqq --no-install-recommends libssl-dev
+ - apt-get install -yqq --no-install-recommends pkg-config
  - python3 --version
  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3 get-pip.py
