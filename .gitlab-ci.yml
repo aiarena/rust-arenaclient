@@ -17,7 +17,7 @@ before_script:
  - apt-get update -yqq
  - apt-get install -yqq --no-install-recommends ca-certificates
  - apt-get install -yqq --no-install-recommends build-essential
- - apt-get install -yqq --no-install-recommends python3
+ - apt-get install -yqq --no-install-recommends python3-dev
  - apt-get install -yqq --no-install-recommends curl
  - apt-get install -yqq --no-install-recommends python3-distutils
  - apt-get install -yqq --no-install-recommends python3-apt
