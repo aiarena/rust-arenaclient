@@ -32,7 +32,8 @@ before_script:
  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
  - rm -f $PROTOC_ZIP
- - curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y && rustup toolchain add nightly
+ - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && rustup toolchain install nightly
+ - $HOME/.cargo/env
 #
 ## Use cargo to test the project
 ##test:cargo:
