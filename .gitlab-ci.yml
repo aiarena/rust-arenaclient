@@ -16,6 +16,7 @@ image: "debian:latest"
 before_script:
  - apt-get update -yqq
  - apt-get install -yqq --no-install-recommends python3
+ - apt-get install -yqq --no-install-recommends curl
  - python3 --version
  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3 get-pip.py
