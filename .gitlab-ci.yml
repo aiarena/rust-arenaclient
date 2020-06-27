@@ -20,6 +20,7 @@ before_script:
  - apt-get install -yqq --no-install-recommends curl
  - apt-get install -yqq --no-install-recommends python3-distutils
  - apt-get install -yqq --no-install-recommends python3-apt
+ - apt-get install -yqq --no-install-recommends unzip
  - python3 --version
  - curl --insecure https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3 get-pip.py
