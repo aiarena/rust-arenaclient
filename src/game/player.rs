@@ -172,6 +172,9 @@ impl Player {
     }
     /// Saves replay to path
     pub fn save_replay(&mut self, path: String) -> bool{
+        if path == ""{
+            return false;
+        }
         let mut r = Request::new();
         r.set_save_replay(RequestSaveReplay::new());
         if let Some(response) = self.sc2_query(r){

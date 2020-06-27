@@ -6,41 +6,41 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Config {
     #[serde(default)]
-    pids: Vec<u32>,
+    pub(crate) pids: Vec<u32>,
     #[serde(default)]
-    average_frame_time: Vec<HashMap<String, f32>>,
+    pub(crate) average_frame_time: Vec<HashMap<String, f32>>,
     #[serde(default, alias = "Map")]
-    map: String,
+    pub(crate) map: String,
     #[serde(default, alias = "MaxGameTime")]
-    max_game_time: u32,
+    pub(crate) max_game_time: u32,
     #[serde(default, alias = "MaxFrameTime")]
-    max_frame_time: i32,
+    pub(crate) max_frame_time: i32,
     #[serde(default, alias = "Strikes")]
-    strikes: i32,
+    pub(crate) strikes: i32,
     #[serde(default)]
-    result: Vec<HashMap<String, String>>,
+    pub(crate) result: Vec<HashMap<String, String>>,
     #[serde(default, alias = "Player1")]
-    player1: String,
+    pub(crate) player1: String,
     #[serde(default, alias = "Player2")]
-    player2: String,
+    pub(crate) player2: String,
     #[serde(default, alias = "ReplayPath")]
-    replay_path: String,
+    pub(crate) replay_path: String,
     #[serde(default, alias = "MatchID")]
-    match_id: i64,
+    pub(crate) match_id: i64,
     #[serde(default, alias = "ReplayName")]
-    replay_name: String,
+    pub(crate) replay_name: String,
     #[serde(default)]
-    game_time: f32,
+    pub(crate) game_time: f32,
     #[serde(default)]
-    game_time_seconds: f32,
+    pub(crate) game_time_seconds: f32,
     #[serde(default)]
-    game_time_formatted: String,
+    pub(crate) game_time_formatted: String,
     #[serde(default, alias = "DisableDebug")]
-    disable_debug: bool,
+    pub(crate) disable_debug: bool,
     #[serde(default, alias = "RealTime")]
-    real_time: bool,
+    pub(crate) real_time: bool,
     #[serde(default, alias = "Visualize")]
-    visualize: bool,
+    pub(crate) visualize: bool,
 }
 impl Config {
     /// New default config

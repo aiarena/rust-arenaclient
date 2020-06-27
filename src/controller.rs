@@ -5,7 +5,7 @@
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 // use std::collections::HashMap;
-use std::io::ErrorKind::WouldBlock;
+use std::io::ErrorKind::{WouldBlock, ConnectionAborted};
 
 use websocket::message::{Message as ws_Message, OwnedMessage};
 use websocket::result::WebSocketError;
@@ -27,6 +27,7 @@ use websocket::websocket_base::stream::sync::TcpStream;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SupervisorAction {
+    ForceQuit,
     Quit,
     NoAction,
     Received,
@@ -517,14 +518,21 @@ pub fn create_supervisor_listener(
                             sender
                                 .send(SupervisorAction::Received)
                                 .expect("Could not send SupervisorAction");
-                        } else if data.contains("Map") {
+                        } else if data.contains("Map") || data.contains("map") {
                             sender
                                 .send(SupervisorAction::Config(data))
                                 .expect("Could not send config");
+                        } else if data == "Quit"{
+                            sender
+                                .send(SupervisorAction::ForceQuit)
+                                .expect("Could not send ForceQuit");
                         }
                     }
                 }
                 Err(WebSocketError::NoDataAvailable) => {
+                    break;
+                }
+                Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted =>{
                     break;
                 }
                 Err(e) => println!("Supervisor receive error: {:?}", e),

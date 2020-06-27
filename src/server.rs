@@ -72,6 +72,9 @@ impl RustServer {
                     SupervisorAction::Config(config) => {
                         controller.set_config(config);
                     }
+                    SupervisorAction::ForceQuit =>{
+                        break
+                    }
                     _ => {}
                 }
             }
