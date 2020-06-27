@@ -14,9 +14,11 @@ image: "quay.io/pypa/manylinux1_x86_64:latest"
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
+ - yum install xz
  - cd /usr/src
  - curl -o Python-3.7.7.tar.xz https://www.python.org/ftp/python/3.7.7/Python-3.7.7.tar.xz
- - tar -xvf Python-3.7.7.tar.xz
+ - unxz Python-3.7.7.tar.xz
+ - tar -xvf Python-3.7.7.tar
  - cd Python-3.7.7
  - yum install gcc
  - yum install openssl-devel
