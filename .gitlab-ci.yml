@@ -37,6 +37,7 @@ before_script:
  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
  - source $HOME/.cargo/env
  - rustup toolchain install nightly
+ - rustup default nightly
 #
 ## Use cargo to test the project
 ##test:cargo:
@@ -46,7 +47,7 @@ before_script:
 #
 build:
  script:
-  - maturin build --release --manylinux off
+  - maturin build --manylinux off
  artifacts:
   paths:
    - "*/target/wheels/*.whl"
