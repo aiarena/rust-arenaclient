@@ -10,7 +10,7 @@ use websocket::OwnedMessage;
 
 use protobuf::parse_from_bytes;
 use protobuf::{Message, RepeatedField};
-use sc2_proto::sc2api::{Request, RequestJoinGame, Response, Status};
+use sc2_proto::sc2api::{Request, RequestJoinGame, Response, Status, RequestSaveReplay};
 
 use super::messaging::{ChannelToGame, ToGameContent, ToPlayer};
 use crate::config::Config;
@@ -19,6 +19,8 @@ use crate::sc2::{PlayerResult, Race};
 use crate::sc2process::Process;
 use std::thread;
 use std::thread::JoinHandle;
+use std::fs::File;
+use std::io::Write;
 
 /// Player process, connection and details
 pub struct Player {
@@ -168,10 +170,39 @@ impl Player {
         self.sc2_request(r)?;
         self.sc2_recv()
     }
-
+    /// Saves replay to path
+    pub fn save_replay(&mut self, path: String) -> bool{
+        let mut r = Request::new();
+        r.set_save_replay(RequestSaveReplay::new());
+        if let Some(response) = self.sc2_query(r){
+            if response.has_save_replay(){
+                match File::create(&path){
+                    Ok(mut buffer) => {
+                        let data: &[u8] = response.get_save_replay().get_data();
+                        buffer.write(data);
+                        println!("Replay saved to {:?}", &path);
+                        true
+                    },
+                    Err(e) =>{
+                        println!("Failed to create replay file {:?}: {:?}", &path, e);
+                        false
+                    }
+                }
+            }
+            else{
+                println!("No replay data available");
+                false
+            }
+        }
+        else{
+            println!("Could not save replay");
+            false
+        }
+    }
     /// Run game communication loop
     #[must_use]
     pub fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
+        let replay_path = config.replay_path();
         let mut start_timer = false;
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
@@ -208,6 +239,7 @@ impl Player {
             start_time = Instant::now();
 
             if response.has_quit() {
+                self.save_replay(replay_path);
                 self.frame_time = frame_time / self.game_loops as f32;
                 self.frame_time = if self.frame_time.is_nan() {
                     0_f32
@@ -220,6 +252,7 @@ impl Player {
                 self.process.wait();
                 return Some(self);
             } else if response.has_leave_game() {
+                self.save_replay(replay_path);
                 self.frame_time = frame_time / self.game_loops as f32;
                 self.frame_time = if self.frame_time.is_nan() {
                     0_f32
@@ -252,10 +285,12 @@ impl Player {
                         self.game_loops,
                         self.frame_time,
                     )));
+                    self.save_replay(replay_path);
                     self.process.kill();
                     return Some(self);
                 }
                 if self.game_loops > config.max_game_time() {
+                    self.save_replay(replay_path);
                     self.frame_time = frame_time / self.game_loops as f32;
                     self.frame_time = if self.frame_time.is_nan() {
                         0_f32
@@ -276,6 +311,7 @@ impl Player {
             if let Some(msg) = gamec.recv() {
                 return match msg {
                     ToPlayer::Quit => {
+                        self.save_replay(replay_path);
                         self.frame_time = frame_time / self.game_loops as f32;
                         self.frame_time = if self.frame_time.is_nan() {
                             0_f32

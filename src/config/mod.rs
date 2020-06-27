@@ -27,7 +27,7 @@ pub struct Config {
     replay_path: String,
     #[serde(default, alias = "MatchID")]
     match_id: i64,
-    #[serde(default)]
+    #[serde(default, alias = "ReplayName")]
     replay_name: String,
     #[serde(default)]
     game_time: f32,
@@ -71,4 +71,5 @@ impl Config {
     pub fn max_game_time(&self) -> u32 {
         self.max_game_time
     }
+    pub fn replay_path(&self) -> String{self.replay_path.clone()}
 }
