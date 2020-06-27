@@ -1,7 +1,7 @@
 # This file is a template, and might need editing before it works on your project.
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/rust/tags/
-image: "konstin2/maturin:master"
+image: "debian:latest"
 
 # Optional: Pick zero or more services to be used on all builds.
 # Only needed when using a docker container to run your tests in.
@@ -14,13 +14,17 @@ image: "konstin2/maturin:master"
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
- - echo starting protoc
+ - apt-get python3.7
+ - python3.7 --version
+ - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+ - python3.7 get-pip.py
+ - pip3 install maturin
+ - pip install cffi virtualenv
  - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
  - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
  - rm -f $PROTOC_ZIP
- - echo protoc done
 #
 ## Use cargo to test the project
 ##test:cargo:
@@ -28,10 +32,9 @@ before_script:
 ##    - rustc --version && cargo --version  # Print version info for debugging
 ##    - cargo test --workspace --verbose
 #
-
 build:
  script:
-  - echo build
-# artifacts:
-#  paths:
-#   - "*/target/wheels/*.whl"
+  - maturin build --release --manylinux off
+ artifacts:
+  paths:
+   - "*/target/wheels/*.whl"
