@@ -14,11 +14,13 @@ image: "konstin2/maturin:latest"
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
+ - echo starting protoc
  - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
  - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
  - rm -f $PROTOC_ZIP
+ - echo protoc done
 #
 ## Use cargo to test the project
 ##test:cargo:
