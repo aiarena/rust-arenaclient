@@ -1,6 +1,6 @@
 //! Game manages a single unstarted game, including its configuration
 
-use log::{debug, error};
+use log::error;
 use std::thread::JoinHandle;
 
 use protobuf::RepeatedField;
@@ -36,7 +36,8 @@ impl GameLobby {
     }
     pub fn join_player_handles(&mut self) {
         while let Some(handle) = self.player_handles.pop() {
-            self.players.push(handle.join().unwrap());
+            // self.players.push(handle.join().unwrap());
+            self.players.insert(0, handle.join().unwrap());
         }
     }
     /// Checks if this lobby has any player participants
@@ -48,6 +49,7 @@ impl GameLobby {
     pub fn join(&mut self, connection: Client, join_req: RequestJoinGame, client_name: String) {
         let mut pd = PlayerData::from_join_request(join_req);
         pd.name = Some(client_name);
+        // println!("{:?},{:?}", connection.peer_addr(), client_name);
         self.player_handles.push(Player::new(connection, pd))
         // self.players.push(Player::new(connection, pd));
     }
@@ -57,9 +59,8 @@ impl GameLobby {
         use sc2_proto::sc2api::{LocalMap, Request, RequestCreateGame};
 
         let mut r_local_map = LocalMap::new();
-        r_local_map.set_map_path(
-            find_map(self.config.map().clone()).expect("Map not found (Config::check?)"),
-        );
+        let map = self.config.clone().map().clone();
+        r_local_map.set_map_path(find_map(map).expect("Map not found (Config::check?)"));
 
         let mut r_create_game = RequestCreateGame::new();
         r_create_game.set_local_map(r_local_map);
@@ -100,7 +101,7 @@ impl GameLobby {
             error!("Could not create game: {:?}", resp_create_game.get_error());
             return None;
         } else {
-            debug!("Game created succesfully");
+            println!("Game created succesfully");
         }
 
         Some(())
@@ -151,7 +152,7 @@ impl GameLobby {
                 error!("Could not join game: {:?}", resp_join_game.get_error());
                 return None;
             } else {
-                debug!("Game join succesful");
+                println!("Game join succesful");
             }
 
             // No error, pass through the response
@@ -178,7 +179,13 @@ impl GameLobby {
     }
 
     /// Destroy the lobby, closing all the connections
-    pub fn close(self) {}
+    pub fn close(&mut self) {
+        while let Some(handle) = self.player_handles.pop() {
+            if let Ok(mut p) = handle.join() {
+                p.process.kill()
+            }
+        }
+    }
 }
 
 /// Used to pass player setup info to CreateGame

@@ -26,7 +26,7 @@ pub struct Config {
     #[serde(default, alias = "ReplayPath")]
     replay_path: String,
     #[serde(default, alias = "MatchID")]
-    match_id: String,
+    match_id: i64,
     #[serde(default)]
     replay_name: String,
     #[serde(default)]

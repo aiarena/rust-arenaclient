@@ -1,7 +1,6 @@
 //! Game manages a single game, including configuration and result gathering
 
 use crossbeam::channel::{select, Receiver, Sender};
-use log::{debug, warn};
 use std::thread;
 
 use crate::config::Config;
@@ -51,25 +50,29 @@ impl Game {
         } = msg;
         match content {
             ToGameContent::GameOver(results) => {
-                player_results.splice(.., results.0.into_iter().map(Some));
+                for i in 0..player_results.len() {
+                    if player_results[i].is_none() {
+                        player_results[i] = Some(results.0[i])
+                    }
+                }
                 *game_loops = results.1;
                 frame_times[player_index] = results.2;
             }
             ToGameContent::LeftGame => {
-                debug!("Player left game before it was over");
+                println!("Player left game before it was over");
                 player_results[player_index] = Some(PlayerResult::Defeat);
             }
             ToGameContent::QuitBeforeLeave => {
-                warn!("Client quit without leaving the game");
+                println!("Client quit without leaving the game");
                 player_results[player_index] = Some(PlayerResult::Defeat);
             }
             ToGameContent::SC2UnexpectedConnectionClose => {
-                warn!("SC2 process closed connection unexpectedly");
-                player_results[player_index] = Some(PlayerResult::Defeat);
+                println!("SC2 process closed connection unexpectedly");
+                player_results[player_index] = Some(PlayerResult::SC2Crash);
             }
             ToGameContent::UnexpectedConnectionClose => {
-                warn!("Unexpected connection close");
-                player_results[player_index] = Some(PlayerResult::Defeat);
+                println!("Unexpected connection close");
+                player_results[player_index] = Some(PlayerResult::Crash);
             }
         }
     }
@@ -107,7 +110,7 @@ impl Game {
                 recv(from_sv) -> r => match r {
                     Ok(FromSupervisor::Quit) => {
                         // Game quit requested
-                        debug!("Supervisor requested game quit");
+                        println!("Supervisor requested game quit");
 
                         result_tx
                             .send(GameResult {
@@ -143,7 +146,6 @@ impl Game {
                 }
             }
         }
-
         // Send game result to the supervisor
         result_tx
             .send(GameResult {

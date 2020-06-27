@@ -2,7 +2,7 @@
 
 #![allow(dead_code)]
 
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 // use std::collections::HashMap;
 use std::io::ErrorKind::WouldBlock;
@@ -16,9 +16,22 @@ use crate::config::Config;
 use crate::game::{spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle};
 use crate::proxy::Client;
 use crate::result::JsonResult;
+use crossbeam::channel::{Receiver, Sender};
 use protobuf::Message;
 use sc2_proto::{self, sc2api::RequestJoinGame};
 use std::collections::HashMap;
+use std::thread;
+use std::time::Duration;
+use websocket::sync::{Reader, Writer};
+use websocket::websocket_base::stream::sync::TcpStream;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SupervisorAction {
+    Quit,
+    NoAction,
+    Received,
+    Config(String),
+}
 
 enum PlaylistAction {
     Respond(OwnedMessage),
@@ -52,7 +65,9 @@ pub struct Controller {
     /// Connections (in nonblocking mode) waiting for a game
     /// If a game join is requested is pending (with remote), then also contains that
     clients: Vec<(String, Client, Option<RequestJoinGame>)>,
-    supervisor: Option<Client>,
+    supervisor: Option<Writer<TcpStream>>,
+    // super_sender: Option<Writer<TcpStream>>,
+    super_recv: Option<Receiver<SupervisorAction>>,
     config: Option<Config>,
     /// Games waiting for more players
     lobbies: HashMap<GameId, GameLobby>,
@@ -76,6 +91,7 @@ impl Controller {
         Self {
             clients: Vec::with_capacity(2),
             supervisor: None,
+            super_recv: None,
             config: None,
             lobbies: HashMap::with_capacity(1),
             games: HashMap::with_capacity(1),
@@ -86,23 +102,47 @@ impl Controller {
     /// Reset Controller for new game
     pub fn reset(&mut self) {
         self.clients = Vec::with_capacity(2);
-        self.supervisor = None;
         self.config = None;
         self.lobbies = HashMap::with_capacity(1);
         self.games = HashMap::with_capacity(1);
         self.id_counter = GameId(0);
         self.connected_clients = 0;
     }
+
     /// Sends a message to the supervisor
     pub fn send_message(&mut self, message: &str) {
         match &mut self.supervisor {
-            Some(sup) => sup
-                .send_message(&ws_Message::text(message))
-                .expect("Failed to send message to supervisor"),
+            Some(sender) => {
+                sender
+                    .send_message(&ws_Message::text(message))
+                    .expect("Could not send message to supervisor");
+            }
             None => {
-                println!("Supervisor not set");
+                println!("send_message: Supervisor not set");
             }
         }
+
+        // match &mut self.supervisor {
+        //     Some(sup) => {
+        //         sup.set_nonblocking(false);
+        //         sup.send_message(&ws_Message::text(message))
+        //             .expect("Failed to send message to supervisor")
+        //     }
+        //     None => {
+        //         println!("send_message: Supervisor not set");
+        //     }
+        // }
+    }
+    pub fn receive_confirmation(&mut self) {
+        // match &mut self.supervisor {
+        //     Some(sup) => {
+        //         sup.recv_message()
+        //             .expect("Failed to send message to supervisor");
+        //     }
+        //     None => {
+        //         println!("receive_confirmation: Supervisor not set");
+        //     }
+        // }
     }
     /// Create new lobby
     fn create_lobby(&mut self) -> Option<GameId> {
@@ -119,22 +159,30 @@ impl Controller {
             None
         }
     }
-
+    pub fn has_supervisor(&self) -> bool {
+        self.supervisor.is_some()
+    }
     /// Add a new client socket to playlist
     pub fn add_client(&mut self, client: Client) {
-        debug!("Added client");
+        println!("Added client {:?}", client.peer_addr());
         client
             .set_nonblocking(true)
             .expect("Could not set non-blocking");
+        client
+            .stream_ref()
+            .set_read_timeout(Some(Duration::new(40, 0)))
+            .expect("Could not set read timeout");
         debug_assert!(self.clients.len() < 2);
         match self.config.clone() {
             Some(config) => {
                 if self.connected_clients == 0 {
                     self.clients.push((config.player1(), client, None));
+                    println!("{:?}", config.player1());
                     self.connected_clients += 1;
                 } else {
                     self.clients.push((config.player2(), client, None));
                     self.connected_clients += 1;
+                    println!("{:?}", config.player2());
                 }
             }
             None => {
@@ -144,37 +192,43 @@ impl Controller {
     }
 
     /// Add a new supervisor client socket
-    pub fn add_supervisor(&mut self, client: Client) {
+    pub fn add_supervisor(&mut self, client: Writer<TcpStream>, recv: Receiver<SupervisorAction>) {
         if self.supervisor.is_some() {
             println!("Supervisor already set - Resetting supervisor");
         }
-        debug!("Added supervisor");
-        client
-            .set_nonblocking(true)
-            .expect("Could not set non-blocking");
+        println!("Added supervisor");
+        // client
+        //     .set_nonblocking(false)
+        //     .expect("Could not set non-blocking");
+        // self.supervisor = Some(client);
+
         self.supervisor = Some(client);
+        self.super_recv = Some(recv);
     }
 
-    /// Get the config from the supervisor
-    pub fn get_config_from_supervisor(&mut self) {
-        if self.config.is_none() {
-            match &mut self.supervisor {
-                Some(sup) => match sup.recv_message() {
-                    Ok(msg) => match msg {
-                        OwnedMessage::Text(data) => {
-                            self.config = Some(Config::load_from_str(&data));
-                        }
-                        e => println!("Unknown message: Expected Text, received {:?}", &e),
-                    },
-                    Err(e) => {
-                        println!("Could not receive from supervisor: {:?}", &e);
+    pub fn recv_msg(&self) -> Option<SupervisorAction> {
+        match &self.super_recv {
+            Some(recv) => {
+                while let Ok(data) = recv.try_recv() {
+                    if data != SupervisorAction::NoAction {
+                        return Some(data);
+                    } else {
+                        continue;
                     }
-                },
-                None => {
-                    println!("No Supervisor set");
                 }
+                None
             }
+            None => None,
         }
+        //         match recv.try_recv() {
+        //         Ok(data) => data,
+        //         Err(_) => SupervisorAction::NoAction,
+        //     },
+        //     _ => SupervisorAction::NoAction,
+        // }
+    }
+    pub fn set_config(&mut self, config: String) {
+        self.config = Some(Config::load_from_str(&config))
     }
 
     /// Remove client from playlist, closing the connection
@@ -189,7 +243,7 @@ impl Controller {
     }
 
     /// Remove supervisor
-    fn drop_supervisor(&mut self) {
+    pub(crate) fn drop_supervisor(&mut self) {
         match &mut self.supervisor {
             Some(client) => {
                 client
@@ -200,7 +254,8 @@ impl Controller {
             None => {
                 error!("Cannot drop - No supervisor set");
             }
-        }
+        };
+        self.super_recv = None;
     }
     //
     // /// Gets a client index by identifier (peer address for now) if any
@@ -221,14 +276,13 @@ impl Controller {
         let (client_name, client, old_req) = self.clients.remove(index);
 
         if old_req != None {
-            warn!("Client attempted to join a game twice (dropping connection)");
+            println!("Client attempted to join a game twice (dropping connection)");
             return None;
         }
 
         client
             .set_nonblocking(false)
             .expect("Could not set non-blocking");
-        // println!("Joining game");
         // TODO: Verify that InterfaceOptions are allowed
         // TODO: Fix this so it works without lobbies
 
@@ -271,26 +325,46 @@ impl Controller {
                         PlaylistAction::respond(resp)
                     }
                     Ok(ref m) if m.has_join_game() => {
-                        debug!("Game join");
+                        println!("Game join");
                         PlaylistAction::JoinGame(m.get_join_game().clone())
                     }
                     Ok(other) => {
-                        warn!("Unsupported message in playlist {:?}", other);
+                        println!("Unsupported message in playlist {:?}", other);
                         PlaylistAction::Kick
                     }
                     Err(err) => {
-                        warn!("Invalid message {:?}", err);
+                        println!("Invalid message {:?}", err);
                         PlaylistAction::Kick
                     }
                 }
             }
             other => {
-                warn!("Unsupported message type {:?}", other);
+                println!("Unsupported message type {:?}", other);
                 PlaylistAction::Kick
             }
         }
     }
-
+    // pub fn update_supervisor(&mut self) -> SupervisorAction {
+    //     match &mut self.supervisor {
+    //         Some(supervisor) => {
+    //             if let Ok(msg) = supervisor.recv_message() {
+    //                 if let OwnedMessage::Text(data) = msg {
+    //                     println!("{:?}", data);
+    //                     if data == "Reset" {
+    //                         SupervisorAction::Quit
+    //                     } else {
+    //                         SupervisorAction::NoAction
+    //                     }
+    //                 } else {
+    //                     SupervisorAction::NoAction
+    //                 }
+    //             } else {
+    //                 SupervisorAction::NoAction
+    //             }
+    //         }
+    //         None => SupervisorAction::NoAction,
+    //     }
+    // }
     /// Update clients in playlist to see if they join a game or disconnect
     pub fn update_clients(&mut self) {
         for i in (0..self.clients.len()).rev() {
@@ -317,13 +391,13 @@ impl Controller {
                         // println!("Join game received");
                         let join_response = self.client_join_game(i, req);
                         if join_response == None {
-                            warn!("Game creation / joining failed");
+                            println!("Game creation / joining failed");
                         }
                     }
                 },
                 Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {}
                 Err(err) => {
-                    warn!("Invalid message {:?}", err);
+                    println!("Invalid message {:?}", err);
                     self.drop_client(i);
                 }
             };
@@ -335,7 +409,7 @@ impl Controller {
         let mut games_over = Vec::new();
         for (id, game) in self.games.iter_mut() {
             if game.check() {
-                println!("game over");
+                println!("Game over");
                 games_over.push(id.clone());
             }
         }
@@ -365,17 +439,8 @@ impl Controller {
                     game_result.insert(p2.clone(), player_results[1].to_string());
                     let game_time = Some(result.game_loops);
                     let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
-                    // let average_frame_time: Option<HashMap<String, f32>>;
-
-                    // if let Some(avg) = result.average_frame_time {
-                    //     println!("{:?}", avg);
-                    //     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-                    //     avg_hash.insert(p1.clone(), avg[0]);
-                    //     avg_hash.insert(p2.clone(), avg[1]);
-                    //     average_frame_time = Some(avg_hash);
-                    // } else {
-                    //     average_frame_time = None
-                    // }
+                    println!("{:?}", game_result);
+                   
                     let j_result = JsonResult::from(
                         Some(game_result),
                         game_time,
@@ -385,10 +450,12 @@ impl Controller {
                         Some("Complete".to_string()),
                     );
                     self.send_message(j_result.serialize().as_ref());
+                    self.receive_confirmation();
                     for i in (0..self.clients.len()).rev() {
                         self.drop_client(i)
                     }
                     self.drop_supervisor();
+                    self.reset();
                     // println!("Game result: {:?}", result);
                 }
                 Err(msg) => {
@@ -400,25 +467,29 @@ impl Controller {
 
     /// Destroys the controller, ending all games,
     /// and closing all connections and threads
-    pub fn close(self) {
-        debug!("Closing Controller");
+    pub fn close(&mut self) {
+        println!("Closing Controller");
 
         // Tell all games to quit
-        for (_id, mut game) in self.games.into_iter() {
+        for (_, game) in self.games.iter_mut() {
             game.send(FromSupervisor::Quit);
         }
 
         // Destroy all lobbies
-        for (_id, lobby) in self.lobbies.into_iter() {
+        for (_, lobby) in self.lobbies.iter_mut() {
             lobby.close();
         }
+        for (_, client, _) in &self.clients {
+            client.shutdown().expect("Could not close connection");
+        }
+        self.reset()
 
         // Close all game list connections by drop
     }
 }
 
 /// Return type of Controller.update_remote
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoteUpdateStatus {
     /// Server quit requested
     Quit,
@@ -426,4 +497,38 @@ pub enum RemoteUpdateStatus {
     Processed,
     /// No action was taken
     NoAction,
+}
+
+pub fn create_supervisor_listener(
+    mut client_recv: Reader<TcpStream>,
+    sender: Sender<SupervisorAction>,
+) {
+    thread::spawn(move || {
+        while let r_msg = client_recv.recv_message() {
+            match r_msg {
+                Ok(msg) => {
+                    if let OwnedMessage::Text(data) = msg {
+                        if data == "Reset" {
+                            sender
+                                .send(SupervisorAction::Quit)
+                                .expect("Could not send SupervisorAction");
+                            break;
+                        } else if data == "Received" {
+                            sender
+                                .send(SupervisorAction::Received)
+                                .expect("Could not send SupervisorAction");
+                        } else if data.contains("Map") {
+                            sender
+                                .send(SupervisorAction::Config(data))
+                                .expect("Could not send config");
+                        }
+                    }
+                }
+                Err(WebSocketError::NoDataAvailable) => {
+                    break;
+                }
+                Err(e) => println!("Supervisor receive error: {:?}", e),
+            }
+        }
+    });
 }

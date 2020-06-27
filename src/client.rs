@@ -31,7 +31,6 @@ impl ClientSession {
 
     pub fn receive_bytes(&mut self, py: Python) -> PyResult<Py<PyBytes>> {
         if let Message::Binary(t) = self.client.read_message().unwrap() {
-            println!("{:?}", &t);
             Ok(PyBytes::new(py, &t).into())
         } else {
             Err(exceptions::TypeError::py_err("Expected Binary"))

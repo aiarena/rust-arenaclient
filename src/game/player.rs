@@ -2,7 +2,7 @@
 
 use log::{debug, error, trace, warn};
 use std::fmt;
-use std::io::ErrorKind::{ConnectionAborted, ConnectionReset};
+use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut};
 use std::time::Instant;
 
 use websocket::result::WebSocketError;
@@ -23,7 +23,7 @@ use std::thread::JoinHandle;
 /// Player process, connection and details
 pub struct Player {
     /// SC2 process for this player
-    process: Process,
+    pub(crate) process: Process,
     /// SC2 websocket connection
     sc2_ws: Client,
     /// Proxy connection to connected client
@@ -102,6 +102,13 @@ impl Player {
             Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
                 warn!(
                     "Client {:?} closed connection unexpectedly (connection abort)",
+                    self.connection.peer_addr().expect("PeerAddr")
+                );
+                None
+            }
+            Err(WebSocketError::IoError(ref e)) if e.kind() == TimedOut => {
+                warn!(
+                    "Client {:?} stopped responding",
                     self.connection.peer_addr().expect("PeerAddr")
                 );
                 None
@@ -199,20 +206,36 @@ impl Player {
             self.client_respond(response.clone());
             start_timer = true;
             start_time = Instant::now();
+
             if response.has_quit() {
-                self.frame_time = frame_time;
+                self.frame_time = frame_time / self.game_loops as f32;
+                self.frame_time = if self.frame_time.is_nan() {
+                    0_f32
+                } else {
+                    self.frame_time
+                };
                 debug!("SC2 is shutting down");
                 gamec.send(ToGameContent::QuitBeforeLeave);
                 debug!("Waiting for the process");
                 self.process.wait();
                 return Some(self);
             } else if response.has_leave_game() {
-                self.frame_time = frame_time;
+                self.frame_time = frame_time / self.game_loops as f32;
+                self.frame_time = if self.frame_time.is_nan() {
+                    0_f32
+                } else {
+                    self.frame_time
+                };
                 debug!("Client left the game");
                 gamec.send(ToGameContent::LeftGame);
                 return Some(self);
             } else if response.has_observation() {
-                self.frame_time = frame_time;
+                self.frame_time = frame_time / self.game_loops as f32;
+                self.frame_time = if self.frame_time.is_nan() {
+                    0_f32
+                } else {
+                    self.frame_time
+                };
                 let obs = response.get_observation();
                 let obs_results = obs.get_player_result();
                 self.game_loops = obs.get_observation().get_game_loop();
@@ -233,7 +256,12 @@ impl Player {
                     return Some(self);
                 }
                 if self.game_loops > config.max_game_time() {
-                    self.frame_time = frame_time;
+                    self.frame_time = frame_time / self.game_loops as f32;
+                    self.frame_time = if self.frame_time.is_nan() {
+                        0_f32
+                    } else {
+                        self.frame_time
+                    };
                     debug!("Max time reached");
                     gamec.send(ToGameContent::GameOver((
                         vec![PlayerResult::Tie, PlayerResult::Tie],
@@ -246,14 +274,19 @@ impl Player {
             }
 
             if let Some(msg) = gamec.recv() {
-                match msg {
+                return match msg {
                     ToPlayer::Quit => {
-                        self.frame_time = frame_time;
+                        self.frame_time = frame_time / self.game_loops as f32;
+                        self.frame_time = if self.frame_time.is_nan() {
+                            0_f32
+                        } else {
+                            self.frame_time
+                        };
                         debug!("Killing the process by request from the game");
                         self.process.kill();
-                        return Some(self);
+                        Some(self)
                     }
-                }
+                };
             }
         }
 
@@ -294,7 +327,11 @@ impl PlayerData {
             } else {
                 None
             },
-            ifopts: req.get_options().clone(),
+            ifopts: {
+                let mut ifopts = req.get_options().clone();
+                ifopts.set_raw_affects_selection(true);
+                ifopts
+            },
         }
     }
 }

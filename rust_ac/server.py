@@ -3,6 +3,9 @@ from multiprocessing import Process
 
 
 class Server:
+    """
+    Set up and run the Proxy server.
+    """
     def __init__(self, ip_addr: str):
         self.server = PServer(ip_addr)
         self.process: Process = None

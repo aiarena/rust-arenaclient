@@ -3,7 +3,7 @@ use crossbeam::channel::{self, TryRecvError};
 // use std::env::var;
 // use std::fs::File;
 // use std::io::prelude::*;
-use crate::controller::Controller;
+use crate::controller::{create_supervisor_listener, Controller, SupervisorAction};
 use crate::proxy;
 use bincode::{deserialize, serialize};
 use pyo3::prelude::*;
@@ -32,7 +32,7 @@ impl RustServer {
 
     pub fn run(&self) -> JoinHandle<()> {
         let (proxy_sender, proxy_receiver) = channel::unbounded();
-
+        let (sup_send, sup_recv) = channel::unbounded();
         let addr = self.ip_addr.clone();
         thread::spawn(move || {
             proxy::run(&addr, proxy_sender);
@@ -42,17 +42,40 @@ impl RustServer {
             match proxy_receiver.try_recv() {
                 Ok((c_type, client)) => match c_type {
                     ClientType::Bot => {
-                        controller.add_client(client);
-                        controller.send_message("{\"Bot\": \"Connected\"}")
+                        if !controller.has_supervisor() {
+                            println!("No supervisor - Client shutdown");
+                            client.shutdown().expect("Could not close connection");
+                        } else {
+                            controller.add_client(client);
+                            controller.send_message("{\"Bot\": \"Connected\"}")
+                        }
                     }
                     ClientType::Controller => {
-                        controller.add_supervisor(client);
-                        controller.get_config_from_supervisor();
+                        let client_split = client.split().unwrap();
+                        controller.add_supervisor(client_split.1, sup_recv.to_owned());
+                        // controller.get_config_from_supervisor();
+                        create_supervisor_listener(client_split.0, sup_send.to_owned());
+                        controller.send_message("{\"Status\": \"Connected\"}");
                     }
                 },
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => break,
             }
+            if let Some(action) = controller.recv_msg() {
+                match action {
+                    SupervisorAction::Quit => {
+                        println!("Quit request received");
+                        controller.close();
+                        controller.send_message("Reset");
+                        controller.drop_supervisor();
+                    }
+                    SupervisorAction::Config(config) => {
+                        controller.set_config(config);
+                    }
+                    _ => {}
+                }
+            }
+
             controller.update_clients();
             controller.update_games();
             thread::sleep(::std::time::Duration::from_millis(100));
@@ -83,10 +106,20 @@ impl PServer {
             _ => unreachable!(),
         }
     }
-    pub fn run(&self) -> bool {
+    pub fn run(&self) -> Result<(), PyErr> {
         match &self.server {
-            Some(server) => server.run().join().is_ok(),
-            None => false,
+            Some(server) => {
+                println!("Starting server on {:?}", server.ip_addr);
+                match server.run().join() {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(pyo3::exceptions::ConnectionError::py_err(
+                        "Could not start server. Address in use",
+                    )),
+                }
+            }
+            None => Err(pyo3::exceptions::AssertionError::py_err(
+                "Server not set. Did you initialize the object?",
+            )),
         }
     }
 
