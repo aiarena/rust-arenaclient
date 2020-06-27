@@ -16,7 +16,6 @@ image: "quay.io/pypa/manylinux1_x86_64:latest"
 before_script:
  - curl https://raw.githubusercontent.com/dvershinin/apt-get-centos/master/apt-get.sh -o /usr/local/bin/apt-get
  - chmod 0755 /usr/local/bin/apt-get
- - apt-get update -yqq
  - apt-get install -yqq --no-install-recommends python3.7
  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3.7 get-pip.py
