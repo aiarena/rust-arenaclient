@@ -14,7 +14,7 @@ image: "quay.io/pypa/manylinux1_x86_64:latest"
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
- - yum install -yqq --no-install-recommends python3.7
+ - yum install -yqq python3.7
  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3.7 get-pip.py
  - pip3 install maturin
