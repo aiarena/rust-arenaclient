@@ -15,8 +15,8 @@ image: "quay.io/pypa/manylinux1_x86_64:latest"
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
  - cd /usr/src
- - sudo wget https://www.python.org/ftp/python/3.7.7/Python-3.7.7.tar.xz
- - sudo tar -xvf Python-3.7.7.tar.xz
+ - wget https://www.python.org/ftp/python/3.7.7/Python-3.7.7.tar.xz
+ - tar -xvf Python-3.7.7.tar.xz
  - cd Python-3.7.7
  - yum install gcc
  - yum install openssl-devel
