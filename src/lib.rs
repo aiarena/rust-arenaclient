@@ -1,5 +1,4 @@
 #![feature(test)]
-pub mod client;
 use pyo3::prelude::*;
 
 pub mod config;

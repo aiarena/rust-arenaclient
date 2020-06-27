@@ -10,8 +10,7 @@ name = "rust_ac"
 crate-type = ["cdylib"]
 
 [dependencies]
-websocket = "*"
-tungstenite = "*"
+websocket = "0.24.0"
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
 protobuf = { version = "*", features = ["with-bytes"] }
 log = "0.4"

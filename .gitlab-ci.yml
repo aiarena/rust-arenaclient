@@ -50,4 +50,4 @@ build:
   - maturin build --manylinux off
  artifacts:
   paths:
-   - "*/target/wheels/*.whl"
+   - "target/wheels/*.whl"
