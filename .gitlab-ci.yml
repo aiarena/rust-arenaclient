@@ -15,12 +15,7 @@ image: "debian:latest"
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
  - apt-get update -yqq
- - apt-get install -yqq --no-install-recommends build-essential
- - apt-get install -yqq --no-install-recommends python3
- - apt-get install -yqq --no-install-recommends curl
- - apt-get install -yqq --no-install-recommends python3-distutils
- - apt-get install -yqq --no-install-recommends python3-apt
- - apt-get install -yqq --no-install-recommends unzip
+ - apt-get install -yqq --no-install-recommends ca-certificates, build-essential, python3, curl, python3-distutils, python3-apt, unzip
  - python3 --version
  - curl --insecure https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3 get-pip.py
@@ -31,7 +26,7 @@ before_script:
  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
  - rm -f $PROTOC_ZIP
- - curl --insecure --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y && rustup toolchain add nightly
+ - curl --insecure https://sh.rustup.rs -sSf | sh -s -- -y && rustup toolchain add nightly
 #
 ## Use cargo to test the project
 ##test:cargo:
