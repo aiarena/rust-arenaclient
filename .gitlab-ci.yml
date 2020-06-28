@@ -60,13 +60,14 @@ before_script:
  - DIR=StarCraftII/
  - if ! [ -d "$DIR" ]; then wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip' \
   && unzip -P iagreetotheeula SC2.4.10.zip \
+  && rm SC2.4.10.zip \
   && ln -s StarCraftII/Maps StarCraftII/maps \
   && rm -Rf StarCraftII/maps/* \
   && wget -q 'http://blzdistsc2-a.akamaihd.net/MapPacks/Ladder2019Season3.zip' \
   && unzip -P iagreetotheeula Ladder2019Season3.zip \
   && rm Ladder2019Season3.zip \
   && mv Ladder2019Season3 StarCraftII/maps; fi
- - ls ~/
+ - ls .
  - wget https://gitlab.com/aiarena/aiarena-test-bots/-/archive/master/aiarena-test-bots-master.tar.gz
  - tar -xf aiarena-test-bots-master.tar.gz
  - SC2_PROXY_BASE=StarCraftII/
