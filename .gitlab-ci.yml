@@ -56,10 +56,10 @@ before_script:
  - rustup toolchain install nightly
  - rustup default nightly
    #Download SC2
- - DIR=SC2.4.10.zip
+ - DIR="SC2.4.10.zip"
  - if ! [ -f "$DIR" ]; then wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip'; fi
  - unzip -P iagreetotheeula SC2.4.10.zip
- - mv /StarCraft\ II ~/StarCraft\ II/
+ - mv /StarCraftII ~/StarCraft\ II/
  - ls ~/
  - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
  - rm -Rf ~/StarCraft\ II/maps/*
