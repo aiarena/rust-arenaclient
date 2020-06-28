@@ -11,6 +11,7 @@ cache:
     - .cache/pip
     - venv/
     - SC2.4.10.zip
+    - target/
 # Optional: Pick zero or more services to be used on all builds.
 # Only needed when using a docker container to run your tests in.
 # Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
@@ -60,17 +61,15 @@ before_script:
  - if ! [ -f "$DIR" ]; then wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip'; fi
  - unzip -P iagreetotheeula SC2.4.10.zip
  - ls
-# - mv /StarCraftII ~/StarCraft\ II/
-# - ls ~/
-# - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
-# - rm -Rf ~/StarCraft\ II/maps/*
-# - wget -q 'http://blzdistsc2-a.akamaihd.net/MapPacks/Ladder2019Season3.zip' \
-#  && unzip -P iagreetotheeula Ladder2019Season3.zip \
-#  && rm Ladder2019Season3.zip
-# - mv Ladder2019Season3 ~/StarCraft\ II/maps
-# - wget https://gitlab.com/aiarena/aiarena-test-bots/-/archive/master/aiarena-test-bots-master.tar.gz
-# - tar -xf aiarena-test-bots-master.tar.gz
-# - ls
+ - mv StarCraftII ~/StarCraft\ II/
+ - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
+ - rm -Rf ~/StarCraft\ II/maps/*
+ - wget -q 'http://blzdistsc2-a.akamaihd.net/MapPacks/Ladder2019Season3.zip' \
+  && unzip -P iagreetotheeula Ladder2019Season3.zip \
+  && rm Ladder2019Season3.zip
+ - mv Ladder2019Season3 ~/StarCraft\ II/maps
+ - wget https://gitlab.com/aiarena/aiarena-test-bots/-/archive/master/aiarena-test-bots-master.tar.gz
+ - tar -xf aiarena-test-bots-master.tar.gz
 #
 ## Use cargo to test the project
 ##test:cargo:
