@@ -10,7 +10,7 @@ cache:
   paths:
     - .cache/pip
     - venv/
-    - StarCraftII/
+#    - StarCraftII/
     - target/
 # Optional: Pick zero or more services to be used on all builds.
 # Only needed when using a docker container to run your tests in.
@@ -85,7 +85,7 @@ before_script:
 
 build:
  script:
-  - maturin build --manylinux off
+  - maturin build --release --manylinux off
  artifacts:
   paths:
    - "target/wheels/*.whl"
