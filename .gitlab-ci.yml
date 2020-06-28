@@ -45,7 +45,7 @@ before_script:
  - wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip' \
   && unzip -P iagreetotheeula SC2.4.10.zip \
   && rm SC2.4.10.zip
- - mv /StarCraftII ~/StarCraft\ II/
+ - mv /StarCraft\ II ~/StarCraft\ II/
  - ls ~/
  - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
  - rm -Rf ~/StarCraft\ II/maps/*
