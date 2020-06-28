@@ -1,4 +1,3 @@
-#![feature(test)]
 use pyo3::prelude::*;
 
 pub mod config;
@@ -12,7 +11,7 @@ mod result;
 pub mod sc2;
 mod sc2process;
 pub mod server;
-extern crate test;
+
 
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {

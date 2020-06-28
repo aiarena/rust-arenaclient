@@ -36,6 +36,7 @@ before_script:
  - apt-get install -yqq --no-install-recommends pkg-config
  - apt-get install -yqq --no-install-recommends wget
  - apt-get install -yqq --no-install-recommends xz-utils
+ - apt-get install -yqq --no-install-recommends unzip
    #Install python libs
  - python3 --version
  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
@@ -54,12 +55,13 @@ before_script:
    #Install Rust
  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
  - source $HOME/.cargo/env
- - rustup toolchain install nightly
- - rustup default nightly
+ - rustup toolchain install stable
+ - rustup default stable
    #Download SC2
  - DIR=StarCraftII/
  - if ! [ -d "$DIR" ]; then wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip' \
   && unzip -P iagreetotheeula SC2.4.10.zip \
+  && ls .
   && rm SC2.4.10.zip \
   && ln -s StarCraftII/Maps StarCraftII/maps \
   && rm -Rf StarCraftII/maps/* \

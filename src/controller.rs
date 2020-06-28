@@ -411,7 +411,7 @@ impl Controller {
         for (id, game) in self.games.iter_mut() {
             if game.check() {
                 println!("Game over");
-                games_over.push(id.clone());
+                games_over.push(*id);
             }
         }
 
@@ -505,7 +505,8 @@ pub fn create_supervisor_listener(
     sender: Sender<SupervisorAction>,
 ) {
     thread::spawn(move || {
-        while let r_msg = client_recv.recv_message() {
+        loop {
+            let r_msg = client_recv.recv_message();
             match r_msg {
                 Ok(msg) => {
                     if let OwnedMessage::Text(data) = msg {
@@ -522,7 +523,7 @@ pub fn create_supervisor_listener(
                             sender
                                 .send(SupervisorAction::Config(data))
                                 .expect("Could not send config");
-                        } else if data == "Quit"{
+                        } else if data == "Quit" {
                             sender
                                 .send(SupervisorAction::ForceQuit)
                                 .expect("Could not send ForceQuit");
@@ -532,11 +533,10 @@ pub fn create_supervisor_listener(
                 Err(WebSocketError::NoDataAvailable) => {
                     break;
                 }
-                Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted =>{
+                Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
                     break;
                 }
                 Err(e) => println!("Supervisor receive error: {:?}", e),
             }
-        }
-    });
+        }});
 }

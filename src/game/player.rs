@@ -182,7 +182,7 @@ impl Player {
                 match File::create(&path){
                     Ok(mut buffer) => {
                         let data: &[u8] = response.get_save_replay().get_data();
-                        buffer.write(data);
+                        buffer.write_all(data).expect("Could not write to replay file");
                         println!("Replay saved to {:?}", &path);
                         true
                     },
