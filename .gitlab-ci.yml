@@ -69,3 +69,6 @@ build:
  artifacts:
   paths:
    - "target/wheels/*.whl"
+ cache:
+   paths:
+    - ~/StarCraft\ II/
