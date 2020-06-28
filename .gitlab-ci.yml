@@ -5,11 +5,12 @@ image: "debian:latest"
 
 variables:
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
 cache:
   paths:
     - .cache/pip
     - venv/
-    - ~/StarCraft\ II/
+    - SC2.4.10.zip
 # Optional: Pick zero or more services to be used on all builds.
 # Only needed when using a docker container to run your tests in.
 # Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
@@ -21,6 +22,7 @@ cache:
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
+   #Install required apt packages
  - apt-get update -yqq
  - apt-get install -yqq --no-install-recommends ca-certificates
  - apt-get install -yqq --no-install-recommends build-essential
@@ -33,6 +35,7 @@ before_script:
  - apt-get install -yqq --no-install-recommends pkg-config
  - apt-get install -yqq --no-install-recommends wget
  - apt-get install -yqq --no-install-recommends xz-utils
+   #Install python libs
  - python3 --version
  - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
  - python3 get-pip.py
@@ -40,19 +43,22 @@ before_script:
  - virtualenv venv
  - source venv/bin/activate
  - pip3 install maturin
+ - pip3 install burnysc2
+   #Install protoc
  - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
  - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
  - rm -f $PROTOC_ZIP
+   #Install Rust
  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
  - source $HOME/.cargo/env
  - rustup toolchain install nightly
  - rustup default nightly
- - pip3 install burnysc2
- - wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip' \
-  && unzip -P iagreetotheeula SC2.4.10.zip \
-  && rm SC2.4.10.zip
+   #Download SC2
+ - DIR=SC2.4.10.zip
+ - if ! [ -f "$DIR" ]; then wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip'; fi
+ - unzip -P iagreetotheeula SC2.4.10.zip
  - mv /StarCraft\ II ~/StarCraft\ II/
  - ls ~/
  - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
