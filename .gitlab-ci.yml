@@ -40,8 +40,7 @@ before_script:
  - source $HOME/.cargo/env
  - rustup toolchain install nightly
  - rustup default nightly
- - wget https://gitlab.com/aiarena/aiarena-client-provisioning/raw/master/aiarena-vm/templates/python-requirements.txt.j2 -O bot-requirements.txt
- - pip3 install -r bot-requirements.txt
+ - pip3 install burnysc2
  - wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip' \
   && unzip -P iagreetotheeula SC2.4.10.zip \
   && rm SC2.4.10.zip
