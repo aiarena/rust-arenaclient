@@ -59,17 +59,18 @@ before_script:
  - DIR="SC2.4.10.zip"
  - if ! [ -f "$DIR" ]; then wget -q 'http://blzdistsc2-a.akamaihd.net/Linux/SC2.4.10.zip'; fi
  - unzip -P iagreetotheeula SC2.4.10.zip
- - mv /StarCraftII ~/StarCraft\ II/
- - ls ~/
- - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
- - rm -Rf ~/StarCraft\ II/maps/*
- - wget -q 'http://blzdistsc2-a.akamaihd.net/MapPacks/Ladder2019Season3.zip' \
-  && unzip -P iagreetotheeula Ladder2019Season3.zip \
-  && rm Ladder2019Season3.zip
- - mv Ladder2019Season3 ~/StarCraft\ II/maps
- - wget https://gitlab.com/aiarena/aiarena-test-bots/-/archive/master/aiarena-test-bots-master.tar.gz
- - tar -xf aiarena-test-bots-master.tar.gz
  - ls
+# - mv /StarCraftII ~/StarCraft\ II/
+# - ls ~/
+# - ln -s ~/StarCraft\ II/Maps ~/StarCraft\ II/maps
+# - rm -Rf ~/StarCraft\ II/maps/*
+# - wget -q 'http://blzdistsc2-a.akamaihd.net/MapPacks/Ladder2019Season3.zip' \
+#  && unzip -P iagreetotheeula Ladder2019Season3.zip \
+#  && rm Ladder2019Season3.zip
+# - mv Ladder2019Season3 ~/StarCraft\ II/maps
+# - wget https://gitlab.com/aiarena/aiarena-test-bots/-/archive/master/aiarena-test-bots-master.tar.gz
+# - tar -xf aiarena-test-bots-master.tar.gz
+# - ls
 #
 ## Use cargo to test the project
 ##test:cargo:
