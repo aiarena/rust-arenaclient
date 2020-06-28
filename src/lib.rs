@@ -35,7 +35,7 @@ mod tests {
     fn start_bot(cwd: String){
         let bot_file = "run.py";
 
-        let process = (Command::new("python")
+        let process = (Command::new("python3")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .arg(bot_file)
