@@ -25,7 +25,10 @@ bincode = "*"
 
 [dependencies.pyo3]
 version = "0.11.0"
-features = ["extension-module"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+default = ["extension-module"]
 
 
 [profile.release]
