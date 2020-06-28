@@ -67,6 +67,7 @@ before_script:
   && unzip -P iagreetotheeula Ladder2019Season3.zip \
   && rm Ladder2019Season3.zip \
   && mv Ladder2019Season3 ~/StarCraft\ II/maps; fi
+ - ls ~/
  - wget https://gitlab.com/aiarena/aiarena-test-bots/-/archive/master/aiarena-test-bots-master.tar.gz
  - tar -xf aiarena-test-bots-master.tar.gz
 #

@@ -17,7 +17,7 @@ fn default_base() -> PathBuf {
     } else if cfg!(target_os = "macos") {
         Path::new("/Applications/StarCraft II").to_path_buf()
     } else if cfg!(linux) {
-        Path::new(&shellexpand::tilde("~/StarCraftII").into_owned()).to_path_buf()
+        Path::new(&shellexpand::tilde("~/StarCraft II").into_owned()).to_path_buf()
     } else {
         panic!("Unknown system, use SC2_PROXY_BASE env var");
     }
