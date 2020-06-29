@@ -86,6 +86,7 @@ build:python:
  image: "quay.io/pypa/manylinux1_x86_64:latest"
  script:
   - yum install curl
+  - python3 -m pip install maturin
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
   - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
   - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
@@ -104,6 +105,7 @@ build:python:
 build:cargo:
  image: "debian:latest"
  script:
+  - apt-get update -yqq
   - apt-get install -yqq --no-install-recommends curl
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
   - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
