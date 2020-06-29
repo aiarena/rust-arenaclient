@@ -85,6 +85,7 @@ before_script:
 build:python:
  image: "quay.io/pypa/manylinux1_x86_64:latest"
  script:
+  - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
   - yum install curl
   - python3 -m pip install maturin
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
@@ -107,6 +108,13 @@ build:cargo:
  script:
   - apt-get update -yqq
   - apt-get install -yqq --no-install-recommends curl
+  - apt-get install -yqq --no-install-recommends build-essential
+  - apt-get install -yqq --no-install-recommends python3-dev
+  - apt-get install -yqq --no-install-recommends curl
+  - apt-get install -yqq --no-install-recommends python3-distutils
+  - apt-get install -yqq --no-install-recommends python3-apt
+  - apt-get install -yqq --no-install-recommends unzip
+  - apt-get install -yqq --no-install-recommends libssl-dev
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
   - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
   - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
