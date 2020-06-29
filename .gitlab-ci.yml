@@ -86,10 +86,7 @@ build:python:
  image: "quay.io/pypa/manylinux1_x86_64:latest"
  script:
   - yum update
-  - yum install -y openssl-devel
-  - openssl version
   - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
-  - yum install -y curl
   - python3 -m pip install maturin
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
   - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP

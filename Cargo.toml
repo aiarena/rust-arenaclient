@@ -14,7 +14,7 @@ name = "rust_ac_bin"
 path = "src/main.rs"
 
 [dependencies]
-websocket = "0.24.0"
+#websocket = "0.24.0"
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
 protobuf = { version = "*", features = ["with-bytes"] }
 log = "0.4"
@@ -27,6 +27,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = "*"
 pretty_env_logger ="0.4.0"
+
+[dependencies.websocket]
+version = "0.24.0"
+default-features = false
+features = ["sync"]
 
 [dependencies.pyo3]
 version = "0.11.0"
