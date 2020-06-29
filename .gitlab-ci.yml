@@ -93,9 +93,9 @@ build:python:
   - rustup default stable
   - maturin build
 
-# artifacts:
-#  paths:
-#   - "target/wheels/*.whl"
+ artifacts:
+  paths:
+   - "target/wheels/*.whl"
 
 build:cargo:
  image: "debian:latest"
