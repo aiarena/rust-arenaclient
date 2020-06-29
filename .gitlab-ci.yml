@@ -85,6 +85,8 @@ before_script:
 build:python:
  image: "quay.io/pypa/manylinux1_x86_64:latest"
  script:
+  - yum update
+  - yum install openssl-devel
   - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
   - yum install curl
   - python3 -m pip install maturin
