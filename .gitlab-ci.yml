@@ -10,15 +10,7 @@ cache:
   paths:
     - .cache/pip
     - venv/
-#    - StarCraftII/
     - target/
-# Optional: Pick zero or more services to be used on all builds.
-# Only needed when using a docker container to run your tests in.
-# Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
-# services:
-#   - mysql:latest
-#   - redis:latest
-#   - postgres:latest
 
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
@@ -85,6 +77,7 @@ before_script:
 build:python:
  image: "quay.io/pypa/manylinux1_x86_64:latest"
  script:
+  - export RUST_BACKTRACE=1
   - yum update
   - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
   - python3 -m pip install maturin
@@ -106,6 +99,7 @@ build:python:
 build:cargo:
  image: "debian:latest"
  script:
+  - export RUST_BACKTRACE=1
   - apt-get update -yqq
   - apt-get install -yqq --no-install-recommends ca-certificates
   - apt-get install -yqq --no-install-recommends curl
