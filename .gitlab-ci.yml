@@ -1,56 +1,62 @@
 # This file is a template, and might need editing before it works on your project.
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/rust/tags/
-
+image: "debian:latest"
 
 variables:
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-    CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
 
 cache:
   paths:
     - .cache/pip
     - venv/
+#    - StarCraftII/
     - target/
-    - .cargo
+# Optional: Pick zero or more services to be used on all builds.
+# Only needed when using a docker container to run your tests in.
+# Check out: http://docs.gitlab.com/ce/ci/docker/using_docker_images.html#what-is-a-service
+# services:
+#   - mysql:latest
+#   - redis:latest
+#   - postgres:latest
 
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
 #Install required apt packages
-# - apt-get update -yqq
-# - apt-get install -yqq --no-install-recommends ca-certificates
-# - apt-get install -yqq --no-install-recommends build-essential
-# - apt-get install -yqq --no-install-recommends python3-dev
-# - apt-get install -yqq --no-install-recommends curl
-# - apt-get install -yqq --no-install-recommends python3-distutils
-# - apt-get install -yqq --no-install-recommends python3-apt
-# - apt-get install -yqq --no-install-recommends unzip
-# - apt-get install -yqq --no-install-recommends libssl-dev
-# - apt-get install -yqq --no-install-recommends pkg-config
-# - apt-get install -yqq --no-install-recommends wget
-# - apt-get install -yqq --no-install-recommends xz-utils
-# - apt-get install -yqq --no-install-recommends unzip
-   #Install python libs
-# - python3 --version
-# - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-# - python3 get-pip.py
-# - pip3 install cffi virtualenv
-# - virtualenv venv
-# - source venv/bin/activate
-# - pip3 install maturin
-# - pip3 install burnysc2
-   #Install protoc
-# - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
-# - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
-# - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-# - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
-# - rm -f $PROTOC_ZIP
-   #Install Rust
-# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-# - source $HOME/.cargo/env
-# - rustup toolchain install stable
-# - rustup default stable
+ - apt-get update -yqq
+ - apt-get install -yqq --no-install-recommends ca-certificates
+ - apt-get install -yqq --no-install-recommends build-essential
+ - apt-get install -yqq --no-install-recommends python3-dev
+ - apt-get install -yqq --no-install-recommends curl
+ - apt-get install -yqq --no-install-recommends python3-distutils
+ - apt-get install -yqq --no-install-recommends python3-apt
+ - apt-get install -yqq --no-install-recommends unzip
+ - apt-get install -yqq --no-install-recommends pkg-config
+ - apt-get install -yqq --no-install-recommends wget
+ - apt-get install -yqq --no-install-recommends xz-utils
+ - apt-get install -yqq --no-install-recommends unzip
+ - apt-get install -yqq --no-install-recommends libssl-dev
+#   Install python libs
+ - python3 --version
+ - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+ - python3 get-pip.py
+ - pip3 install cffi virtualenv
+ - virtualenv venv
+ - source venv/bin/activate
+ - pip3 install maturin
+ - pip3 install burnysc2
+#   Install protoc
+ - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
+ - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
+ - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+ - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+ - rm -f $PROTOC_ZIP
+#   Install Rust
+ - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ - source $HOME/.cargo/env
+ - rustup toolchain install stable
+ - rustup default stable
 #   #Download SC2 # Skip until it's fixed
 # - DIR=StarCraftII/
 # - if ! [ -d "$DIR" ]; then echo "Download" \
@@ -69,57 +75,31 @@ before_script:
 # - tar -xf aiarena-test-bots-master.tar.gz
 # - SC2_PROXY_BASE=StarCraftII/
 #
-# Use cargo to test the project
-# Exclude tests until cc link error is resolved
-#test:cargo:
-#  script:
-#    - rustc --version && cargo --version  # Print version info for debugging
-#    - cargo test --no-default-features -- --nocapture server
-#    - cargo test -- --test-threads 1 --nocapture tie
-build:python:
- image: "quay.io/pypa/manylinux2014_x86_64:latest"
+
+#build:python:
+# image: "quay.io/pypa/manylinux1_x86_64:latest"
+# script:
+#  - yum update
+#  - yum install -y openssl-devel
+#  - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
+#  - yum install curl
+#  - python3 -m pip install maturin
+#  - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
+#  - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
+#  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+#  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+#  - rm -f $PROTOC_ZIP
+#  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+#  - source $HOME/.cargo/env
+#  - rustup toolchain install stable
+#  - rustup default stable
+#  - maturin build
+
+
+
+build:
  script:
-  - yum update -y
-  - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
-  - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
-  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
-  - rm -f $PROTOC_ZIP
-  - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
-  - python3 -m pip install maturin
-  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  - source $HOME/.cargo/env
-  - rustup toolchain install stable
-  - rustup default stable
   - maturin build
-
- artifacts:
-  paths:
-   - "target/wheels/*.whl"
-
-build:cargo:
- image: "debian:latest"
- when: manual
- script:
-  - export RUST_BACKTRACE=full
-  - apt-get update -yqq
-  - apt-get install -yqq --no-install-recommends ca-certificates
-  - apt-get install -yqq --no-install-recommends curl
-  - apt-get install -yqq --no-install-recommends build-essential
-  - apt-get install -yqq --no-install-recommends python3-dev
-  - apt-get install -yqq --no-install-recommends curl
-  - apt-get install -yqq --no-install-recommends python3-distutils
-  - apt-get install -yqq --no-install-recommends python3-apt
-  - apt-get install -yqq --no-install-recommends unzip
-  - apt-get install -yqq --no-install-recommends libssl-dev
-  - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
-  - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
-  - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-  - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
-  - rm -f $PROTOC_ZIP
-  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  - source $HOME/.cargo/env
-  - rustup toolchain install stable
-  - rustup default stable
-#  - cargo build --lib
-#   - cargo build --bin rust_ac_bin
+  artifacts:
+    paths:
+     - "target/wheels/*.whl"
