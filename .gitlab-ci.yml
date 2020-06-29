@@ -1,7 +1,7 @@
 # This file is a template, and might need editing before it works on your project.
 # Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/rust/tags/
-image: "debian:latest"
+
 
 variables:
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
@@ -82,10 +82,14 @@ before_script:
 #    - rustc --version && cargo --version  # Print version info for debugging
 #    - cargo test --no-default-features -- --nocapture server
 ##    - cargo test -- --test-threads 1 --nocapture tie
-
-build:
+build:python:
+ image: "quay.io/pypa/manylinux1_x86_64"
  script:
-  - maturin build --release --manylinux off
- artifacts:
-  paths:
-   - "target/wheels/*.whl"
+  - maturin build --release
+  artifacts:
+   paths:
+    - "target/wheels/*.whl"
+build:
+ image: "debian:latest"
+ script:
+  - cargo build
