@@ -81,15 +81,16 @@ before_script:
 #  script:
 #    - rustc --version && cargo --version  # Print version info for debugging
 #    - cargo test --no-default-features -- --nocapture server
-##    - cargo test -- --test-threads 1 --nocapture tie
+#    - cargo test -- --test-threads 1 --nocapture tie
 build:python:
- image: "quay.io/pypa/manylinux1_x86_64"
+ image: "quay.io/pypa/manylinux1_x86_64:latest"
  script:
-  - maturin build --release
-  artifacts:
-   paths:
-    - "target/wheels/*.whl"
-build:
+  - maturin build
+ artifacts:
+  paths:
+   - "target/wheels/*.whl"
+
+build:cargo:
  image: "debian:latest"
  script:
   - cargo build
