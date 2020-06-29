@@ -9,7 +9,6 @@ mod result;
 pub mod sc2;
 mod sc2process;
 pub mod server;
-use pretty_env_logger;
 
 fn main() -> Result<(), String> {
     pretty_env_logger::init();

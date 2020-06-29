@@ -12,7 +12,6 @@ use pyo3::ToPyObject;
 use serde::{Deserialize, Serialize};
 use std::thread;
 use std::thread::JoinHandle;
-use pretty_env_logger;
 pub enum ClientType {
     Bot,
     Controller,
