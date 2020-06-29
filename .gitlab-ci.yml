@@ -23,7 +23,7 @@ cache:
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
-   #Install required apt packages
+#Install required apt packages
 # - apt-get update -yqq
 # - apt-get install -yqq --no-install-recommends ca-certificates
 # - apt-get install -yqq --no-install-recommends build-essential
@@ -96,7 +96,7 @@ build:python:
   - rustup toolchain install stable
   - rustup default stable
   - maturin build
-    
+
  artifacts:
   paths:
    - "target/wheels/*.whl"
