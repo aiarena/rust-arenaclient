@@ -87,6 +87,7 @@ build:python:
  script:
   - yum update
   - yum install -y openssl-devel
+  - openssl version
   - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
   - yum install -y curl
   - python3 -m pip install maturin
@@ -109,6 +110,7 @@ build:cargo:
  image: "debian:latest"
  script:
   - apt-get update -yqq
+  - apt-get install -yqq --no-install-recommends ca-certificates
   - apt-get install -yqq --no-install-recommends curl
   - apt-get install -yqq --no-install-recommends build-essential
   - apt-get install -yqq --no-install-recommends python3-dev
