@@ -79,14 +79,12 @@ before_script:
 build:python:
  image: "quay.io/pypa/manylinux2014_x86_64:latest"
  script:
+  - yum update
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
   - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
   - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
   - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
   - rm -f $PROTOC_ZIP
-  - protoc -V
-  - export RUST_BACKTRACE=full
-  - yum update
   - export PATH=/opt/python/cp35-cp35m/bin/:/opt/python/cp36-cp36m/bin/:/opt/python/cp37-cp37m/bin/:/opt/python/cp38-cp38/bin/:$PATH
   - python3 -m pip install maturin
   - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
