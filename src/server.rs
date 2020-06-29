@@ -1,11 +1,7 @@
-use crossbeam::channel::{self, TryRecvError};
-// use log::{error, info, warn};
-// use std::env::var;
-// use std::fs::File;
-// use std::io::prelude::*;
 use crate::controller::{create_supervisor_listener, Controller, SupervisorAction};
 use crate::proxy;
 use bincode::{deserialize, serialize};
+use crossbeam::channel::{self, TryRecvError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use pyo3::ToPyObject;
@@ -71,9 +67,7 @@ impl RustServer {
                     SupervisorAction::Config(config) => {
                         controller.set_config(config);
                     }
-                    SupervisorAction::ForceQuit =>{
-                        break
-                    }
+                    SupervisorAction::ForceQuit => break,
                     _ => {}
                 }
             }

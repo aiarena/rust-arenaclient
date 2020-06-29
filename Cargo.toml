@@ -49,6 +49,3 @@ panic="abort"
 lto = "fat"
 codegen-units = 1
 
-[dev-dependencies]
-serial_test = "0.4.0"
-

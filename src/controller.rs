@@ -5,7 +5,7 @@
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 // use std::collections::HashMap;
-use std::io::ErrorKind::{WouldBlock, ConnectionAborted};
+use std::io::ErrorKind::{ConnectionAborted, WouldBlock};
 
 use websocket::message::{Message as ws_Message, OwnedMessage};
 use websocket::result::WebSocketError;
@@ -441,7 +441,7 @@ impl Controller {
                     let game_time = Some(result.game_loops);
                     let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
                     println!("{:?}", game_result);
-                   
+
                     let j_result = JsonResult::from(
                         Some(game_result),
                         game_time,
@@ -504,39 +504,38 @@ pub fn create_supervisor_listener(
     mut client_recv: Reader<TcpStream>,
     sender: Sender<SupervisorAction>,
 ) {
-    thread::spawn(move || {
-        loop {
-            let r_msg = client_recv.recv_message();
-            match r_msg {
-                Ok(msg) => {
-                    if let OwnedMessage::Text(data) = msg {
-                        if data == "Reset" {
-                            sender
-                                .send(SupervisorAction::Quit)
-                                .expect("Could not send SupervisorAction");
-                            break;
-                        } else if data == "Received" {
-                            sender
-                                .send(SupervisorAction::Received)
-                                .expect("Could not send SupervisorAction");
-                        } else if data.contains("Map") || data.contains("map") {
-                            sender
-                                .send(SupervisorAction::Config(data))
-                                .expect("Could not send config");
-                        } else if data == "Quit" {
-                            sender
-                                .send(SupervisorAction::ForceQuit)
-                                .expect("Could not send ForceQuit");
-                        }
+    thread::spawn(move || loop {
+        let r_msg = client_recv.recv_message();
+        match r_msg {
+            Ok(msg) => {
+                if let OwnedMessage::Text(data) = msg {
+                    if data == "Reset" {
+                        sender
+                            .send(SupervisorAction::Quit)
+                            .expect("Could not send SupervisorAction");
+                        break;
+                    } else if data == "Received" {
+                        sender
+                            .send(SupervisorAction::Received)
+                            .expect("Could not send SupervisorAction");
+                    } else if data.contains("Map") || data.contains("map") {
+                        sender
+                            .send(SupervisorAction::Config(data))
+                            .expect("Could not send config");
+                    } else if data == "Quit" {
+                        sender
+                            .send(SupervisorAction::ForceQuit)
+                            .expect("Could not send ForceQuit");
                     }
                 }
-                Err(WebSocketError::NoDataAvailable) => {
-                    break;
-                }
-                Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
-                    break;
-                }
-                Err(e) => println!("Supervisor receive error: {:?}", e),
             }
-        }});
+            Err(WebSocketError::NoDataAvailable) => {
+                break;
+            }
+            Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
+                break;
+            }
+            Err(e) => println!("Supervisor receive error: {:?}", e),
+        }
+    });
 }

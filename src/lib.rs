@@ -12,7 +12,6 @@ pub mod sc2;
 mod sc2process;
 pub mod server;
 
-
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<server::PServer>()?;
@@ -22,16 +21,15 @@ fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::server::RustServer;
-    use websocket::ClientBuilder;
-    use websocket::header::Headers;
-    use websocket::Message;
     use crate::config::Config;
-    use std::process::{Command, Stdio};
+    use crate::server::RustServer;
     use std::path::PathBuf;
-    use serial_test::serial;
+    use std::process::{Command, Stdio};
+    use websocket::header::Headers;
+    use websocket::ClientBuilder;
+    use websocket::Message;
 
-    fn start_bot(cwd: String){
+    fn start_bot(cwd: String) {
         let bot_file = "run.py";
 
         let process = (Command::new("python3")
@@ -51,10 +49,9 @@ mod tests {
         .expect("Could not launch SC2 process");
     }
     #[test]
-    #[serial]
     fn test_server() {
         let mut sup_headers = Headers::new();
-        sup_headers.set_raw("supervisor",vec![b"true".to_vec()]);
+        sup_headers.set_raw("supervisor", vec![b"true".to_vec()]);
 
         let server = RustServer::new("127.0.0.1:8642");
         let t = server.run();
@@ -71,22 +68,21 @@ mod tests {
             supervisor.shutdown();
         }
         assert!(t.join().is_ok())
-        }
+    }
 
     #[test]
-    #[serial]
-    fn test_tie(){
+    fn test_tie() {
         let server = RustServer::new("127.0.0.1:8642");
         let t = server.run();
         let mut sup_headers = Headers::new();
-        sup_headers.set_raw("supervisor",vec![b"true".to_vec()]);
+        sup_headers.set_raw("supervisor", vec![b"true".to_vec()]);
         let mut supervisor = ClientBuilder::new("ws://127.0.0.1:8642/sc2api")
             .unwrap()
             .custom_headers(&sup_headers)
             .connect_insecure()
             .unwrap();
         let msg = supervisor.recv_message();
-        let config = Config{
+        let config = Config {
             pids: vec![],
             average_frame_time: vec![],
             map: "AutomatonLE".to_string(),
@@ -104,7 +100,7 @@ mod tests {
             game_time_formatted: "".to_string(),
             disable_debug: true,
             real_time: false,
-            visualize: false
+            visualize: false,
         };
         supervisor.send_message(&Message::text(serde_json::to_string(&config).unwrap()));
         start_bot("/aiarena-test-bots-master/loser_bot".parse().unwrap());
@@ -112,7 +108,5 @@ mod tests {
         start_bot("/aiarena-test-bots-master/loser_bot".parse().unwrap());
         supervisor.recv_message();
         supervisor.recv_message();
-
     }
 }
-

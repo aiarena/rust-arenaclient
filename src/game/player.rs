@@ -10,17 +10,17 @@ use websocket::OwnedMessage;
 
 use protobuf::parse_from_bytes;
 use protobuf::{Message, RepeatedField};
-use sc2_proto::sc2api::{Request, RequestJoinGame, Response, Status, RequestSaveReplay};
+use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 
 use super::messaging::{ChannelToGame, ToGameContent, ToPlayer};
 use crate::config::Config;
 use crate::proxy::Client;
 use crate::sc2::{PlayerResult, Race};
 use crate::sc2process::Process;
-use std::thread;
-use std::thread::JoinHandle;
 use std::fs::File;
 use std::io::Write;
+use std::thread;
+use std::thread::JoinHandle;
 
 /// Player process, connection and details
 pub struct Player {
@@ -171,33 +171,33 @@ impl Player {
         self.sc2_recv()
     }
     /// Saves replay to path
-    pub fn save_replay(&mut self, path: String) -> bool{
-        if path == ""{
+    pub fn save_replay(&mut self, path: String) -> bool {
+        if path == "" {
             return false;
         }
         let mut r = Request::new();
         r.set_save_replay(RequestSaveReplay::new());
-        if let Some(response) = self.sc2_query(r){
-            if response.has_save_replay(){
-                match File::create(&path){
+        if let Some(response) = self.sc2_query(r) {
+            if response.has_save_replay() {
+                match File::create(&path) {
                     Ok(mut buffer) => {
                         let data: &[u8] = response.get_save_replay().get_data();
-                        buffer.write_all(data).expect("Could not write to replay file");
+                        buffer
+                            .write_all(data)
+                            .expect("Could not write to replay file");
                         println!("Replay saved to {:?}", &path);
                         true
-                    },
-                    Err(e) =>{
+                    }
+                    Err(e) => {
                         println!("Failed to create replay file {:?}: {:?}", &path, e);
                         false
                     }
                 }
-            }
-            else{
+            } else {
                 println!("No replay data available");
                 false
             }
-        }
-        else{
+        } else {
             println!("Could not save replay");
             false
         }

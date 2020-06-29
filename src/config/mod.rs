@@ -71,5 +71,7 @@ impl Config {
     pub fn max_game_time(&self) -> u32 {
         self.max_game_time
     }
-    pub fn replay_path(&self) -> String{self.replay_path.clone()}
+    pub fn replay_path(&self) -> String {
+        self.replay_path.clone()
+    }
 }

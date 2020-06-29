@@ -15,6 +15,4 @@ fn main() -> Result<(), String> {
     let s = server::RustServer::new("127.0.0.1:8642");
     s.run().join();
     Ok(())
-
-
 }
