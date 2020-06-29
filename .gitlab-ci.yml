@@ -125,4 +125,5 @@ build:cargo:
   - source $HOME/.cargo/env
   - rustup toolchain install stable
   - rustup default stable
-  - cargo build
+  - cargo build --lib
+  - cargo build --bin rust_ac_bin
