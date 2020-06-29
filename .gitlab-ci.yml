@@ -77,7 +77,7 @@ before_script:
 #    - cargo test --no-default-features -- --nocapture server
 #    - cargo test -- --test-threads 1 --nocapture tie
 build:python:
- image: "uay.io/pypa/manylinux2014_x86_64:latest"
+ image: "quay.io/pypa/manylinux2014_x86_64:latest"
  script:
   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
   - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
@@ -93,7 +93,7 @@ build:python:
   - source $HOME/.cargo/env
   - rustup toolchain install stable
   - rustup default stable
-#  - maturin build
+  - maturin build
 
 # artifacts:
 #  paths:
