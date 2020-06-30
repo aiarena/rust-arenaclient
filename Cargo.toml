@@ -20,7 +20,7 @@ protobuf = { version = "*", features = ["with-bytes"] }
 log = "0.4"
 shellexpand = "1.0"
 regex = "1.1.0"
-portpicker  = "0.1"
+portpicker  = { git = "https://github.com/danielvschoor/portpicker-rs" }
 tempfile = "3"
 crossbeam = "0.7.1"
 serde = { version = "1.0", features = ["derive"] }
