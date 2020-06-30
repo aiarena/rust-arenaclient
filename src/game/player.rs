@@ -2,7 +2,7 @@
 
 use log::{debug, error, trace, warn};
 use std::fmt;
-use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut};
+use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::time::Instant;
 
 use websocket::result::WebSocketError;
@@ -110,6 +110,13 @@ impl Player {
             }
             Err(WebSocketError::IoError(ref e)) if e.kind() == TimedOut => {
                 warn!(
+                    "Client {:?} stopped responding",
+                    self.connection.peer_addr().expect("PeerAddr")
+                );
+                None
+            }
+            Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock =>{
+                 warn!(
                     "Client {:?} stopped responding",
                     self.connection.peer_addr().expect("PeerAddr")
                 );
