@@ -9,47 +9,12 @@ use std::time::Duration;
 use log::{debug, info, warn};
 
 use portpicker::pick_unused_port;
-// use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 use websocket::client::sync::Client;
 use websocket::stream::sync::TcpStream;
 use websocket::ClientBuilder;
 
 use crate::paths;
-
-/// Default verbosity level for SC2 process
-// fn default_verbosity() -> bool {
-//     true
-// }
-
-/// Options for SC2 process
-// #[allow(missing_docs)]
-// #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-// pub struct ProcessOptions {
-//     #[serde(default)]
-//     pub fullscreen: bool,
-//     #[serde(default = "default_verbosity")]
-//     pub verbose: bool,
-// }
-// impl ProcessOptions {
-//     fn apply(self, mut cmd: &mut Command) -> &mut Command {
-//         cmd = cmd
-//             .arg("-displayMode")
-//             .arg(if self.fullscreen { "1" } else { "0" });
-//         if self.verbose {
-//             cmd = cmd.arg("-verbose");
-//         }
-//         cmd
-//     }
-// }
-// impl Default for ProcessOptions {
-//     fn default() -> Self {
-//         Self {
-//             fullscreen: false,
-//             verbose: true,
-//         }
-//     }
-// }
 
 /// SC2 process
 #[derive(Debug)]

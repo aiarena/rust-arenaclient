@@ -43,3 +43,19 @@ impl PortConfig {
         }
     }
 }
+#[cfg(test)]
+mod tests{
+    use super::*;
+    use sc2_proto::sc2api::RequestJoinGame;
+
+    #[test]
+    fn test_portconfig() {
+        let mut request = RequestJoinGame::new();
+        let port_config = PortConfig::new().expect("Could not create port config");
+        port_config.apply_proto(&mut request, false);
+        assert!(request.has_server_ports());
+        assert!(request.has_shared_port());
+
+    }
+
+}

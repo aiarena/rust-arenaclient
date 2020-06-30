@@ -1,7 +1,6 @@
 //! Proxy WebSocket receiver
 
 use crossbeam::channel::Sender;
-// use log::debug;
 use std::net::ToSocketAddrs;
 
 use crate::server::ClientType;

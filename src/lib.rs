@@ -46,34 +46,13 @@ mod tests {
             .arg("123")
             .current_dir(PathBuf::from(&cwd)))
         .spawn()
-        .expect("Could not launch SC2 process");
-    }
-    #[test]
-    fn test_server() {
-        let mut sup_headers = Headers::new();
-        sup_headers.set_raw("supervisor", vec![b"true".to_vec()]);
-
-        let server = RustServer::new("127.0.0.1:8642");
-        let t = server.run();
-        let mut supervisor = ClientBuilder::new("ws://127.0.0.1:8642/sc2api")
-            .unwrap()
-            .custom_headers(&sup_headers)
-            .connect_insecure()
-            .unwrap();
-        let msg = supervisor.recv_message();
-        let config = serde_json::to_string(&Config::new()).unwrap();
-
-        if let Ok(_) = supervisor.send_message(&Message::text(config)) {
-            supervisor.send_message(&Message::text("Quit"));
-            supervisor.shutdown();
-        }
-        assert!(t.join().is_ok())
+        .expect("Could not launch Bot");
     }
 
     #[test]
     fn test_tie() {
         let server = RustServer::new("127.0.0.1:8642");
-        let t = server.run();
+        let _t = server.run();
         let mut sup_headers = Headers::new();
         sup_headers.set_raw("supervisor", vec![b"true".to_vec()]);
         let mut supervisor = ClientBuilder::new("ws://127.0.0.1:8642/sc2api")
@@ -81,7 +60,7 @@ mod tests {
             .custom_headers(&sup_headers)
             .connect_insecure()
             .unwrap();
-        let msg = supervisor.recv_message();
+        let _msg = supervisor.recv_message().expect("Could not receive");
         let config = Config {
             pids: vec![],
             average_frame_time: vec![],
@@ -104,9 +83,9 @@ mod tests {
         };
         supervisor.send_message(&Message::text(serde_json::to_string(&config).unwrap()));
         start_bot("/aiarena-test-bots-master/loser_bot".parse().unwrap());
-        supervisor.recv_message();
+        supervisor.recv_message().expect("Could not receive");
         start_bot("/aiarena-test-bots-master/loser_bot".parse().unwrap());
-        supervisor.recv_message();
-        supervisor.recv_message();
+        supervisor.recv_message().expect("Could not receive");
+        supervisor.recv_message().expect("Could not receive");
     }
 }

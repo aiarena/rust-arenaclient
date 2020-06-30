@@ -100,7 +100,7 @@ impl PlayerResult {
             Result::Victory => Self::Victory,
             Result::Defeat => Self::Defeat,
             Result::Tie => Self::Tie,
-            Result::Undecided => panic!("Undecided result not alloed"),
+            Result::Undecided => panic!("Undecided result not allowed"),
         }
     }
 
