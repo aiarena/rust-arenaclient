@@ -3,6 +3,7 @@ name = "rust-arenaclient"
 version = "0.1.2"
 authors = ["Daniel <danielvanschoor1997@gmail.com>"]
 edition = "2018"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -14,7 +15,6 @@ name = "rust_ac_bin"
 path = "src/main.rs"
 
 [dependencies]
-#websocket = "0.24.0"
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
 protobuf = { version = "*", features = ["with-bytes"] }
 log = "0.4"

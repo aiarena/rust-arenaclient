@@ -133,3 +133,38 @@ impl PServer {
         Ok(PyBytes::new(py, &serialize(&self.server).unwrap()).to_object(py))
     }
 }
+#[cfg(test)]
+mod tests{
+    use super::*;
+    use pyo3::types::PyDict;
+    use pyo3::py_run;
+
+    fn add_module(py: Python, module: &PyModule) -> PyResult<()> {
+        py.import("sys")?
+            .dict()
+            .get_item("modules")
+            .unwrap()
+            .downcast::<PyDict>()?
+            .set_item(module.name()?, module)
+    }
+
+    #[test]
+    fn test_pickle() {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let module = PyModule::new(py, "rust_ac").unwrap();
+        let addr_tuple = PyTuple::new(py, ["127.0.0.1:8642"].iter());
+        module.add_class::<PServer>().unwrap();
+        add_module(py, module).unwrap();
+        let inst = PyCell::new(py, PServer::new(&addr_tuple)).unwrap();
+        py_run!(
+            py,
+            inst,
+            r#"
+            import pickle
+            inst2 = pickle.loads(pickle.dumps(inst))
+        "#
+        );
+    }
+
+}
