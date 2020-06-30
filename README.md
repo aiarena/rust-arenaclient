@@ -38,6 +38,7 @@ games. The system will interact with the rust_arenaclient through websockets and
 is the supervisor's job. Example of an extremely basic supervisor script in Python:
 ```python
 import os, subprocess, asyncio, aiohttp
+from rust_ac import Server
 
 BOTS_DIRECTORY = "c:/location/of/bots"
 BOTS = ["names of", "bots"] # Only two bots at a time
@@ -98,6 +99,8 @@ async def main():
     result = await ws.receive() # Receives result from proxy after game finishes
 
 if __name__ == "__main__":
+    server = Server(f"{HOST}:{PORT}")
+    server.run()
     asyncio.get_event_loop().run_until_complete(main())
 ```
 
