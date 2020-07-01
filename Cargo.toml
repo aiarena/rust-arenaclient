@@ -18,7 +18,7 @@ path = "src/main.rs"
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
 protobuf = { version = "*", features = ["with-bytes"] }
 log = "0.4"
-shellexpand = "1.0"
+shellexpand = "2.0"
 regex = "1.1.0"
 portpicker  = { git = "https://github.com/danielvschoor/portpicker-rs" }
 tempfile = "3"
