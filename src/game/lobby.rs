@@ -101,7 +101,7 @@ impl GameLobby {
             error!("Could not create game: {:?}", resp_create_game.get_error());
             return None;
         } else {
-            println!("Game created succesfully");
+            println!("Game created successfully");
         }
 
         Some(())
@@ -152,11 +152,11 @@ impl GameLobby {
                 error!("Could not join game: {:?}", resp_join_game.get_error());
                 return None;
             } else {
-                println!("Game join succesful");
+                println!("Game join successful");
             }
 
             // No error, pass through the response
-            player.client_respond(response);
+            player.client_respond(&response);
         }
 
         // TODO: Human players?

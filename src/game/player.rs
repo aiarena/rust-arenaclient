@@ -67,7 +67,7 @@ impl Player {
     }
 
     /// Send a protobuf response to the client
-    pub fn client_respond(&mut self, r: Response) {
+    pub fn client_respond(&mut self, r: &Response) {
         trace!(
             "Response to client: [{}]",
             format!("{:?}", r).chars().take(100).collect::<String>()
@@ -226,7 +226,7 @@ impl Player {
                 response.set_error(RepeatedField::from_vec(vec![
                     "Proxy: Request denied".to_owned()
                 ]));
-                self.client_respond(response.clone());
+                self.client_respond(&response);
             }
 
             // Send request to SC2 and get response
@@ -243,7 +243,7 @@ impl Player {
             self.sc2_status = Some(response.get_status());
 
             // Send SC2 response to client
-            self.client_respond(response.clone());
+            self.client_respond(&response);
             start_timer = true;
             start_time = Instant::now();
 

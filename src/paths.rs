@@ -49,7 +49,7 @@ fn cwd() -> Option<PathBuf> {
     }
 }
 
-fn latest_executeble_path(versions_dir: PathBuf) -> PathBuf {
+fn latest_executable_path(versions_dir: PathBuf) -> PathBuf {
     let (max_version, path) = fs::read_dir(versions_dir)
         .unwrap()
         .filter_map(|entry| -> Option<(u64, PathBuf)> {
@@ -132,7 +132,7 @@ pub fn base_dir() -> PathBuf {
 
 /// PathBuf to SC2 binary executable
 pub fn executable() -> PathBuf {
-    latest_executeble_path(base_dir().join(Path::new("Versions")))
+    latest_executable_path(base_dir().join(Path::new("Versions")))
 }
 
 /// Directory to switch to before starting SC2

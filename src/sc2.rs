@@ -20,7 +20,7 @@ impl Race {
             Race::Terran => Self::Terran,
             Race::Zerg => Self::Zerg,
             Race::Random => Self::Random,
-            Race::NoRace => panic!("NoRace not alloed"),
+            Race::NoRace => panic!("NoRace not allowed"),
         }
     }
 
