@@ -24,6 +24,7 @@ use std::thread;
 use std::time::Duration;
 use websocket::sync::{Reader, Writer};
 use websocket::websocket_base::stream::sync::TcpStream;
+use crate::build_info::BuildInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SupervisorAction {
@@ -320,7 +321,12 @@ impl Controller {
                     Ok(ref m) if m.has_ping() => {
                         trace!("Ping => Pong");
                         let mut resp = sc2_proto::sc2api::Response::new();
-                        let pong = sc2_proto::sc2api::ResponsePing::new();
+                        let mut pong = sc2_proto::sc2api::ResponsePing::new();
+                        let b = BuildInfo::get_build_info_from_file();
+                        pong.set_game_version(b.version);
+                        pong.set_base_build(0);
+                        pong.set_data_build(0);
+                        pong.set_data_version("".to_string());
                         // TODO: Set pong fields, like game version?
                         resp.set_ping(pong);
                         PlaylistAction::respond(resp)
