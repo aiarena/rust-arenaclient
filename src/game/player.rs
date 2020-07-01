@@ -133,7 +133,6 @@ impl Player {
         match self.client_recv()? {
             OwnedMessage::Binary(bytes) => {
                 let resp = parse_from_bytes::<Request>(&bytes).expect("Invalid protobuf message");
-                trace!("Request from the client: {:?}", resp);
                 Some(resp)
             }
             OwnedMessage::Close(_) => None,
@@ -269,6 +268,7 @@ impl Player {
                 } else {
                     self.frame_time
                 };
+                self.process.kill();
                 debug!("Client left the game");
                 gamec.send(ToGameContent::LeftGame);
                 return Some(self);
