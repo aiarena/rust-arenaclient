@@ -9,6 +9,7 @@ mod result;
 pub mod sc2;
 mod sc2process;
 pub mod server;
+mod build_info;
 
 fn main() -> Result<(), String> {
     pretty_env_logger::init();
@@ -16,3 +17,4 @@ fn main() -> Result<(), String> {
     s.run().join();
     Ok(())
 }
+

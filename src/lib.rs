@@ -11,6 +11,7 @@ mod result;
 pub mod sc2;
 mod sc2process;
 pub mod server;
+mod build_info;
 
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
