@@ -12,8 +12,9 @@ use websocket::result::WebSocketError;
 
 use protobuf::parse_from_bytes;
 
+use crate::build_info::BuildInfo;
 use crate::config::Config;
-use crate::game::{spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle};
+use crate::handler::{spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle};
 use crate::proxy::Client;
 use crate::result::JsonResult;
 use crossbeam::channel::{Receiver, Sender};
@@ -24,7 +25,6 @@ use std::thread;
 use std::time::Duration;
 use websocket::sync::{Reader, Writer};
 use websocket::websocket_base::stream::sync::TcpStream;
-use crate::build_info::BuildInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SupervisorAction {
@@ -53,7 +53,7 @@ impl PlaylistAction {
 }
 
 /// Unique identifier for lobby and running games
-/// Game keeps same id from lobby creation until all clients leave the game
+/// Game keeps same id from lobby creation until all clients leave the handler
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GameId(u64);
 impl GameId {
@@ -64,19 +64,19 @@ impl GameId {
 
 /// Controller manages a pool of games and client waiting for games
 pub struct Controller {
-    /// Connections (in nonblocking mode) waiting for a game
-    /// If a game join is requested is pending (with remote), then also contains that
+    /// Connections (in non-blocking mode) waiting for a handler
+    /// If a handler join is requested is pending (with remote), then also contains that
     clients: Vec<(String, Client, Option<RequestJoinGame>)>,
+    /// Supervisor channel writer
     supervisor: Option<Writer<TcpStream>>,
-    // super_sender: Option<Writer<TcpStream>>,
+    /// Supervisor channel receiver
     super_recv: Option<Receiver<SupervisorAction>>,
+    /// Game config received from supervisor
     config: Option<Config>,
-    /// Games waiting for more players
-    lobbies: HashMap<GameId, GameLobby>,
+    /// Pre-game lobby
+    lobby: Option<GameLobby>,
     /// Running games
-    games: HashMap<GameId, GameHandle>,
-    /// Id counter to allocate next id
-    id_counter: GameId,
+    game: Option<GameHandle>,
     /// Connected Clients
     pub connected_clients: usize,
 }
@@ -95,19 +95,17 @@ impl Controller {
             supervisor: None,
             super_recv: None,
             config: None,
-            lobbies: HashMap::with_capacity(1),
-            games: HashMap::with_capacity(1),
-            id_counter: GameId(0),
+            lobby: None,
+            game: None,
             connected_clients: 0,
         }
     }
-    /// Reset Controller for new game
+    /// Reset Controller for new handler
     pub fn reset(&mut self) {
         self.clients = Vec::with_capacity(2);
         self.config = None;
-        self.lobbies = HashMap::with_capacity(1);
-        self.games = HashMap::with_capacity(1);
-        self.id_counter = GameId(0);
+        self.lobby = None;
+        self.game = None;
         self.connected_clients = 0;
     }
 
@@ -123,42 +121,15 @@ impl Controller {
                 println!("send_message: Supervisor not set");
             }
         }
-
-        // match &mut self.supervisor {
-        //     Some(sup) => {
-        //         sup.set_nonblocking(false);
-        //         sup.send_message(&ws_Message::text(message))
-        //             .expect("Failed to send message to supervisor")
-        //     }
-        //     None => {
-        //         println!("send_message: Supervisor not set");
-        //     }
-        // }
-    }
-    pub fn receive_confirmation(&mut self) {
-        // match &mut self.supervisor {
-        //     Some(sup) => {
-        //         sup.recv_message()
-        //             .expect("Failed to send message to supervisor");
-        //     }
-        //     None => {
-        //         println!("receive_confirmation: Supervisor not set");
-        //     }
-        // }
     }
     /// Create new lobby
-    fn create_lobby(&mut self) -> Option<GameId> {
+    fn create_lobby(&mut self) -> bool {
         if let Some(config) = &self.config {
-            let lobby = GameLobby::new(config.clone());
-            let id = self.id_counter;
-            debug_assert!(!self.lobbies.contains_key(&id));
-            debug_assert!(!self.games.contains_key(&id));
-            self.id_counter = self.id_counter.next();
-            self.lobbies.insert(id, lobby);
-            Some(id)
+            self.lobby = Some(GameLobby::new(config.clone()));
+            true
         } else {
-            println!("Did not receive config");
-            None
+            println!("Did not receive config from supervisor");
+            false
         }
     }
     pub fn has_supervisor(&self) -> bool {
@@ -199,11 +170,6 @@ impl Controller {
             println!("Supervisor already set - Resetting supervisor");
         }
         println!("Added supervisor");
-        // client
-        //     .set_nonblocking(false)
-        //     .expect("Could not set non-blocking");
-        // self.supervisor = Some(client);
-
         self.supervisor = Some(client);
         self.super_recv = Some(recv);
     }
@@ -222,12 +188,6 @@ impl Controller {
             }
             None => None,
         }
-        //         match recv.try_recv() {
-        //         Ok(data) => data,
-        //         Err(_) => SupervisorAction::NoAction,
-        //     },
-        //     _ => SupervisorAction::NoAction,
-        // }
     }
     pub fn set_config(&mut self, config: String) {
         self.config = Some(Config::load_from_str(&config))
@@ -245,7 +205,7 @@ impl Controller {
     }
 
     /// Remove supervisor
-    pub(crate) fn drop_supervisor(&mut self) {
+    pub fn drop_supervisor(&mut self) {
         match &mut self.supervisor {
             Some(client) => {
                 client
@@ -259,26 +219,15 @@ impl Controller {
         };
         self.super_recv = None;
     }
-    //
-    // /// Gets a client index by identifier (peer address for now) if any
-    // #[must_use]
-    // pub fn client_index_by_id(&mut self, client_id: String) -> Option<usize> {
-    //     self.playlist
-    //         .iter()
-    //         .enumerate()
-    //         .filter(|(_, (c, _))| c.peer_addr().expect("Could not get peer_addr").to_string() == client_id)
-    //         .map(|(i, _)| i)
-    //         .nth(0)
-    // }
-    //
-    /// Join to game from playlist
-    /// If game join fails, drops connection
+
+    /// Join to handler from playlist
+    /// If handler join fails, drops connection
     #[must_use]
     fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
         let (client_name, client, old_req) = self.clients.remove(index);
 
         if old_req != None {
-            println!("Client attempted to join a game twice (dropping connection)");
+            println!("Client attempted to join a handler twice (dropping connection)");
             return None;
         }
 
@@ -288,16 +237,17 @@ impl Controller {
         // TODO: Verify that InterfaceOptions are allowed
         // TODO: Fix this so it works without lobbies
 
-        if let Some(&id) = self.lobbies.keys().next() {
-            let mut lobby = self.lobbies.remove(&id).unwrap();
+        if self.lobby.is_some() {
+            let mut lobby = self.lobby.take().unwrap();
             lobby.join(client, req, client_name);
             lobby.join_player_handles();
             let game = lobby.start()?;
-            self.games.insert(id, spawn_game(game));
-        } else {
-            let id = self.create_lobby().expect("Could not create lobby");
-            let lobby = self.lobbies.get_mut(&id).unwrap();
+            self.game = Some(spawn_game(game));
+        } else if self.create_lobby() {
+            let lobby = self.lobby.as_mut().unwrap();
             lobby.join(client, req, client_name);
+        } else {
+            println!("Could not create lobby");
         }
 
         Some(())
@@ -327,7 +277,6 @@ impl Controller {
                         pong.set_base_build(0);
                         pong.set_data_build(0);
                         pong.set_data_version("".to_string());
-                        // TODO: Set pong fields, like game version?
                         resp.set_ping(pong);
                         PlaylistAction::respond(resp)
                     }
@@ -351,28 +300,8 @@ impl Controller {
             }
         }
     }
-    // pub fn update_supervisor(&mut self) -> SupervisorAction {
-    //     match &mut self.supervisor {
-    //         Some(supervisor) => {
-    //             if let Ok(msg) = supervisor.recv_message() {
-    //                 if let OwnedMessage::Text(data) = msg {
-    //                     println!("{:?}", data);
-    //                     if data == "Reset" {
-    //                         SupervisorAction::Quit
-    //                     } else {
-    //                         SupervisorAction::NoAction
-    //                     }
-    //                 } else {
-    //                     SupervisorAction::NoAction
-    //                 }
-    //             } else {
-    //                 SupervisorAction::NoAction
-    //             }
-    //         }
-    //         None => SupervisorAction::NoAction,
-    //     }
-    // }
-    /// Update clients in playlist to see if they join a game or disconnect
+
+    /// Update clients in playlist to see if they join a handler or disconnect
     pub fn update_clients(&mut self) {
         for i in (0..self.clients.len()).rev() {
             match self.clients[i].1.recv_message() {
@@ -395,7 +324,7 @@ impl Controller {
                         self.drop_client(i);
                     }
                     PlaylistAction::JoinGame(req) => {
-                        // println!("Join game received");
+                        // println!("Join handler received");
                         let join_response = self.client_join_game(i, req);
                         if join_response == None {
                             println!("Game creation / joining failed");
@@ -411,24 +340,16 @@ impl Controller {
         }
     }
 
-    /// Update game handles to see if they are still running
+    /// Update handler handles to see if they are still running
     pub fn update_games(&mut self) {
-        let mut games_over = Vec::new();
-        for (id, game) in self.games.iter_mut() {
+        let mut game_over = false;
+        if let Some(game) = &mut self.game {
             if game.check() {
-                println!("Game over");
-                games_over.push(*id);
+                game_over = true;
             }
         }
-
-        for id in games_over {
-            let game = self.games.remove(&id).unwrap();
-            // let average_frame_time: Option<HashMap<String, f32>>;
-            // let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-            // for p in game.players.iter(){
-            //     avg_hash.insert(p.player_name().unwrap(), p.frame_time);
-            // }
-            // average_frame_time = Some(avg_hash);
+        if game_over {
+            let game = self.game.take().unwrap();
             match game.collect_result() {
                 Ok((result, players)) => {
                     let average_frame_time: Option<HashMap<String, f32>>;
@@ -439,11 +360,11 @@ impl Controller {
                     average_frame_time = Some(avg_hash);
                     let player_results = result.player_results;
 
-                    let p1 = self.config.clone().unwrap().clone().player1();
-                    let p2 = self.config.clone().unwrap().clone().player2();
+                    let p1 = self.config.clone().unwrap().player1();
+                    let p2 = self.config.clone().unwrap().player2();
                     let mut game_result = HashMap::with_capacity(2);
-                    game_result.insert(p1.clone(), player_results[0].to_string());
-                    game_result.insert(p2.clone(), player_results[1].to_string());
+                    game_result.insert(p1, player_results[0].to_string());
+                    game_result.insert(p2, player_results[1].to_string());
                     let game_time = Some(result.game_loops);
                     let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
                     println!("{:?}", game_result);
@@ -457,7 +378,7 @@ impl Controller {
                         Some("Complete".to_string()),
                     );
                     self.send_message(j_result.serialize().as_ref());
-                    self.receive_confirmation();
+
                     for i in (0..self.clients.len()).rev() {
                         self.drop_client(i)
                     }
@@ -470,6 +391,63 @@ impl Controller {
                 }
             }
         }
+        // let mut games_over = Vec::new();
+        // for (id, game) in self.game.iter_mut() {
+        //     if game.check() {
+        //         println!("Game over");
+        //         games_over.push(*id);
+        //     }
+        // }
+        //
+        // for id in games_over {
+        //     let game = self.game.remove(&id).unwrap();
+        //     // let average_frame_time: Option<HashMap<String, f32>>;
+        //     // let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
+        //     // for p in handler.players.iter(){
+        //     //     avg_hash.insert(p.player_name().unwrap(), p.frame_time);
+        //     // }
+        //     // average_frame_time = Some(avg_hash);
+        //     match game.collect_result() {
+        //         Ok((result, players)) => {
+        //             let average_frame_time: Option<HashMap<String, f32>>;
+        //             let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
+        //             for p in players.into_iter() {
+        //                 avg_hash.insert(p.player_name().unwrap(), p.frame_time);
+        //             }
+        //             average_frame_time = Some(avg_hash);
+        //             let player_results = result.player_results;
+        //
+        //             let p1 = self.config.clone().unwrap().clone().player1();
+        //             let p2 = self.config.clone().unwrap().clone().player2();
+        //             let mut game_result = HashMap::with_capacity(2);
+        //             game_result.insert(p1.clone(), player_results[0].to_string());
+        //             game_result.insert(p2.clone(), player_results[1].to_string());
+        //             let game_time = Some(result.game_loops);
+        //             let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
+        //             println!("{:?}", game_result);
+        //
+        //             let j_result = JsonResult::from(
+        //                 Some(game_result),
+        //                 game_time,
+        //                 game_time_seconds,
+        //                 None,
+        //                 average_frame_time,
+        //                 Some("Complete".to_string()),
+        //             );
+        //             self.send_message(j_result.serialize().as_ref());
+        //             self.receive_confirmation();
+        //             for i in (0..self.clients.len()).rev() {
+        //                 self.drop_client(i)
+        //             }
+        //             self.drop_supervisor();
+        //             self.reset();
+        //             // println!("Game result: {:?}", result);
+        //         }
+        //         Err(msg) => {
+        //             error!("Game thread panicked with: {:?}", msg);
+        //         }
+        //     }
+        // }
     }
 
     /// Destroys the controller, ending all games,
@@ -477,21 +455,28 @@ impl Controller {
     pub fn close(&mut self) {
         println!("Closing Controller");
 
-        // Tell all games to quit
-        for (_, game) in self.games.iter_mut() {
+        // Tell game to quit
+        if let Some(game) = &mut self.game {
             game.send(FromSupervisor::Quit);
         }
+        // for (_, game) in self.game.iter_mut() {
+        //     game.send(FromSupervisor::Quit);
+        // }
 
-        // Destroy all lobbies
-        for (_, lobby) in self.lobbies.iter_mut() {
+        // Destroy lobby
+        if let Some(lobby) = &mut self.lobby {
             lobby.close();
         }
+
+        // for (_, lobby) in self.lobby.iter_mut() {
+        //     lobby.close();
+        // }
         for (_, client, _) in &self.clients {
             client.shutdown().expect("Could not close connection");
         }
         self.reset()
 
-        // Close all game list connections by drop
+        // Close all handler list connections by drop
     }
 }
 

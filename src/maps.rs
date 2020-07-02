@@ -16,16 +16,15 @@ pub fn find_map(mut name: String) -> Option<String> {
         let outer_path = outer.unwrap().path();
         if !outer_path.is_dir() {
             let current = outer_path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .expect("Invalid unicode in path");
+                .file_name()
+                .unwrap()
+                .to_str()
+                .expect("Invalid unicode in path");
             if current.to_ascii_lowercase() == name.to_ascii_lowercase() {
                 let relative = outer_path.strip_prefix(mapdir).unwrap();
                 let relative_str = relative.to_str().unwrap();
                 return Some(relative_str.to_owned());
-            }
-            else{
+            } else {
                 continue;
             }
         }

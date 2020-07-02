@@ -25,7 +25,7 @@ fn any_panic_to_string(panic_msg: Box<dyn Any>) -> String {
 
 /// Game thread handle
 pub struct Handle {
-    /// Handle for the game thread
+    /// Handle for the handler thread
     handle: thread::JoinHandle<Vec<Player>>,
     /// Result connection receiver
     result_rx: Receiver<GameResult>,
@@ -33,18 +33,18 @@ pub struct Handle {
     msg_tx: Sender<FromSupervisor>,
     /// Message connection receiver
     _msg_rx: Receiver<ToSupervisor>,
-    /// Result or error, if the game is over
+    /// Result or error, if the handler is over
     /// Updated by `poll`
     result: Option<Result<GameResult, ()>>,
 }
 impl Handle {
-    /// Send message to the game
-    /// Panics if the game is not running, i.e. the channel is disconnected
+    /// Send message to the handler
+    /// Panics if the handler is not running, i.e. the channel is disconnected
     pub fn send(&mut self, msg: FromSupervisor) {
         self.msg_tx.send(msg).expect("Could not send");
     }
 
-    /// Checks if the game is over
+    /// Checks if the handler is over
     pub fn check(&mut self) -> bool {
         match self.result_rx.try_recv() {
             Err(TryRecvError::Empty) => false,
@@ -59,9 +59,9 @@ impl Handle {
         }
     }
 
-    /// Read result after the game is over, and clean up the game
-    /// Also returns the game result and a list of non-disconnected players
-    /// Panics if game is still running, i.e. `update` hasn't returned true yet
+    /// Read result after the handler is over, and clean up the handler
+    /// Also returns the handler result and a list of non-disconnected players
+    /// Panics if handler is still running, i.e. `update` hasn't returned true yet
     pub fn collect_result(self) -> Result<(GameResult, Vec<Player>), String> {
         if let Some(r) = self.result {
             match r {
@@ -83,7 +83,7 @@ impl Handle {
     }
 }
 
-/// Run game in a thread, returning handle
+/// Run handler in a thread, returning handle
 pub fn spawn(game: Game) -> Handle {
     let (result_tx, result_rx) = channel::unbounded::<GameResult>();
     let (fr_msg_tx, fr_msg_rx) = channel::unbounded::<FromSupervisor>();

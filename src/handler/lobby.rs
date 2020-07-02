@@ -1,4 +1,4 @@
-//! Game manages a single unstarted game, including its configuration
+//! Game manages a single unstarted handler, including its configuration
 
 use log::error;
 use std::thread::JoinHandle;
@@ -9,13 +9,12 @@ use sc2_proto::sc2api::RequestJoinGame;
 use crate::maps::find_map;
 use crate::portconfig::PortConfig;
 use crate::proxy::Client;
-use crate::sc2::{Difficulty, Race};
 
 use super::game::Game;
 use super::player::{Player, PlayerData};
 use crate::config::Config;
 
-/// An unstarted game
+/// An unstarted handler
 #[derive(Debug)]
 pub struct GameLobby {
     /// Game configuration
@@ -26,7 +25,7 @@ pub struct GameLobby {
     player_handles: Vec<JoinHandle<Player>>,
 }
 impl GameLobby {
-    /// Create new empty game lobby from config
+    /// Create new empty handler lobby from config
     pub fn new(config: Config) -> Self {
         Self {
             config,
@@ -45,7 +44,7 @@ impl GameLobby {
         !self.players.is_empty()
     }
 
-    /// Add a new client to the game
+    /// Add a new client to the handler
     pub fn join(&mut self, connection: Client, join_req: RequestJoinGame, client_name: String) {
         let mut pd = PlayerData::from_join_request(join_req);
         pd.name = Some(client_name);
@@ -54,7 +53,7 @@ impl GameLobby {
         // self.players.push(Player::new(connection, pd));
     }
 
-    /// Protobuf to create a new game
+    /// Protobuf to create a new handler
     fn proto_create_game(&self, players: Vec<CreateGamePlayer>) -> sc2_proto::sc2api::Request {
         use sc2_proto::sc2api::{LocalMap, Request, RequestCreateGame};
 
@@ -74,8 +73,8 @@ impl GameLobby {
         request
     }
 
-    /// Create the game using the first client
-    /// Returns None if game join fails (connection close or sc2 process close)
+    /// Create the handler using the first client
+    /// Returns None if handler join fails (connection close or sc2 process close)
     #[must_use]
     pub fn create_game(&mut self) -> Option<()> {
         assert!(!self.players.is_empty());
@@ -98,7 +97,10 @@ impl GameLobby {
         assert!(response.has_create_game());
         let resp_create_game = response.get_create_game();
         if resp_create_game.has_error() {
-            error!("Could not create game: {:?}", resp_create_game.get_error());
+            error!(
+                "Could not create handler: {:?}",
+                resp_create_game.get_error()
+            );
             return None;
         } else {
             println!("Game created successfully");
@@ -107,7 +109,7 @@ impl GameLobby {
         Some(())
     }
 
-    /// Protobuf to join a game
+    /// Protobuf to join a handler
     fn proto_join_game_participant(
         &self,
         portconfig: PortConfig,
@@ -129,7 +131,7 @@ impl GameLobby {
     }
 
     /// Joins all participants to games
-    /// Returns None iff game join fails (connection close or sc2 process close)
+    /// Returns None iff handler join fails (connection close or sc2 process close)
     #[must_use]
     pub fn join_all_game(&mut self) -> Option<()> {
         let pc = PortConfig::new().expect("Unable to find free ports");
@@ -149,7 +151,7 @@ impl GameLobby {
             assert!(response.has_join_game());
             let resp_join_game = response.get_join_game();
             if resp_join_game.has_error() {
-                error!("Could not join game: {:?}", resp_join_game.get_error());
+                error!("Could not join handler: {:?}", resp_join_game.get_error());
                 return None;
             } else {
                 println!("Game join successful");
@@ -165,8 +167,8 @@ impl GameLobby {
         Some(())
     }
 
-    /// Start the game, and send responses to join requests
-    /// Returns None if game create or join fails (connection close or sc2 process close)
+    /// Start the handler, and send responses to join requests
+    /// Returns None if handler create or join fails (connection close or sc2 process close)
     /// In that case, the connections are dropped (closed).
     #[must_use]
     pub fn start(mut self) -> Option<Game> {
@@ -189,10 +191,9 @@ impl GameLobby {
 }
 
 /// Used to pass player setup info to CreateGame
-#[allow(dead_code)]
+// #[allow(dead_code)]
 enum CreateGamePlayer {
     Participant,
-    Computer(Race, Difficulty),
     Observer,
 }
 impl CreateGamePlayer {
@@ -202,11 +203,6 @@ impl CreateGamePlayer {
         match self {
             Self::Participant => {
                 ps.set_field_type(PlayerType::Participant);
-            }
-            Self::Computer(race, difficulty) => {
-                ps.set_field_type(PlayerType::Computer);
-                ps.set_race(race.to_proto());
-                ps.set_difficulty(difficulty.to_proto());
             }
             Self::Observer => {
                 ps.set_field_type(PlayerType::Observer);

@@ -72,11 +72,11 @@ async def main():
     session = aiohttp.ClientSession()
     # Needs "supervisor" header so the proxy knows it's not a bot
     ws = await session.ws_connect(f"ws://{HOST}:{PORT}/sc2api", headers={"supervisor":"True"})
-    # Sends the game config after connecting to proxy
+    # Sends the handler config after connecting to proxy
     await ws.send_json({
                 "Map": "AbiogenesisLE", # Map to play on 
-                "MaxGameTime": 60846, # Max time a game can run before result changes to tie. 
-                                      # Measured in game_loops, which are game seconds / 22.4
+                "MaxGameTime": 60846, # Max time a handler can run before result changes to tie. 
+                                      # Measured in game_loops, which are handler seconds / 22.4
                 "Player1": "BasicBot", # Bot 1 name
                 "Player2": "LoserBot", # Bot 2 name
                 "ReplayPath": r"c:/data/something.SC2Replay", # Path to save replay
@@ -84,7 +84,7 @@ async def main():
                 "DisableDebug": True, # Whether to allow debug commands or filter them out
                 "MaxFrameTime": 1000, # Max time in ms a bot can take on one step
                 "Strikes": 10, # How many times a bot can exceed MaxFrameTime before being kicked
-                "RealTime": False, # Run game in realtime
+                "RealTime": False, # Run handler in realtime
                 "Visualize": False # Unused currently
             }
         )
@@ -96,7 +96,7 @@ async def main():
         msg = await ws.receive() # Waits for confirmation that bot connected
         continue
     
-    result = await ws.receive() # Receives result from proxy after game finishes
+    result = await ws.receive() # Receives result from proxy after handler finishes
 
 if __name__ == "__main__":
     server = Server(f"{HOST}:{PORT}")

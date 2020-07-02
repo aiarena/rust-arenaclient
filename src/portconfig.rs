@@ -26,7 +26,7 @@ impl PortConfig {
         })
     }
 
-    /// Apply port config to a game join request
+    /// Apply port config to a handler join request
     pub fn apply_proto(&self, req: &mut RequestJoinGame, singleplayer: bool) {
         req.set_shared_port(self.shared as i32);
 
@@ -44,7 +44,7 @@ impl PortConfig {
     }
 }
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
     use sc2_proto::sc2api::RequestJoinGame;
 
@@ -55,7 +55,5 @@ mod tests{
         port_config.apply_proto(&mut request, false);
         assert!(request.has_server_ports());
         assert!(request.has_shared_port());
-
     }
-
 }

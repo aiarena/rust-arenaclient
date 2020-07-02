@@ -1,8 +1,9 @@
 use pyo3::prelude::*;
 
+mod build_info;
 pub mod config;
 pub mod controller;
-pub mod game;
+pub mod handler;
 pub mod maps;
 mod paths;
 mod portconfig;
@@ -11,7 +12,6 @@ mod result;
 pub mod sc2;
 mod sc2process;
 pub mod server;
-mod build_info;
 
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {

@@ -1,4 +1,4 @@
-//! Game manages a single game, including configuration and result gathering
+//! Game manages a single handler, including configuration and result gathering
 
 use crossbeam::channel::{select, Receiver, Sender};
 use std::thread;
@@ -19,16 +19,16 @@ pub struct GameResult {
     pub game_loops: u32,
 }
 
-/// Why this game ended
+/// Why this handler ended
 #[derive(Debug, Clone)]
 pub enum GameEndReason {
     /// Game ended naturally
     Normal,
-    /// Supervisor requested game quit
+    /// Supervisor requested handler quit
     QuitRequest,
 }
 
-/// A running game
+/// A running handler
 #[derive(Debug)]
 pub struct Game {
     /// Game configuration
@@ -50,20 +50,20 @@ impl Game {
         } = msg;
         match content {
             ToGameContent::GameOver(results) => {
-                for i in 0..player_results.len() {
-                    if player_results[i].is_none() {
-                        player_results[i] = Some(results.0[i])
+                for (i, item) in player_results.iter_mut().enumerate() {
+                    if item.is_none() {
+                        *item = Some(results.0[i])
                     }
                 }
                 *game_loops = results.1;
                 frame_times[player_index] = results.2;
             }
             ToGameContent::LeftGame => {
-                println!("Player left game before it was over");
+                println!("Player left handler before it was over");
                 player_results[player_index] = Some(PlayerResult::Defeat);
             }
             ToGameContent::QuitBeforeLeave => {
-                println!("Client quit without leaving the game");
+                println!("Client quit without leaving the handler");
                 player_results[player_index] = Some(PlayerResult::Defeat);
             }
             ToGameContent::SC2UnexpectedConnectionClose => {
@@ -77,7 +77,7 @@ impl Game {
         }
     }
 
-    /// Run the game, spawns thread for each participant player
+    /// Run the handler, spawns thread for each participant player
     /// Returns the non-disconnected player instances, so they can be returned to the playlist
     pub fn run(
         self,
@@ -100,17 +100,17 @@ impl Game {
 
         while player_results.contains(&None) {
             select! {
-                // A client ended the game
+                // A client ended the handler
                 recv(rx) -> r => match r {
                     Ok(msg) => {
                         Self::process_msg(msg, &mut player_results, &mut game_loops, &mut frame_times);
                     },
-                    Err(_) => panic!("Player channel closed without sending results"),
+                    Err(e) => panic!("Player channel closed without sending results {:?}",e),
                 },
                 recv(from_sv) -> r => match r {
                     Ok(FromSupervisor::Quit) => {
                         // Game quit requested
-                        println!("Supervisor requested game quit");
+                        println!("Supervisor requested handler quit");
 
                         result_tx
                             .send(GameResult {
@@ -123,7 +123,7 @@ impl Game {
 
                         unimplemented!(); // TODO
                     },
-                    Err(_) => panic!("Supervisor channel closed unexpectedly"),
+                    Err(e) => panic!("Supervisor channel closed unexpectedly: {}", e),
                 }
             }
         }
@@ -140,13 +140,13 @@ impl Game {
                 Ok(None) => {}
                 Err(panic_msg) => {
                     panic!(
-                        "Could not join game-client thread: {:?}",
+                        "Could not join handler-client thread: {:?}",
                         any_panic_to_string(panic_msg)
                     );
                 }
             }
         }
-        // Send game result to the supervisor
+        // Send handler result to the supervisor
         result_tx
             .send(GameResult {
                 end_reason: GameEndReason::Normal,

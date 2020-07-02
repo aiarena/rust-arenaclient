@@ -79,6 +79,7 @@ impl RustServer {
     }
 }
 #[pyclass(module = "rust_ac")]
+#[text_signature = "(ip_addr)"]
 pub(crate) struct PServer {
     server: Option<RustServer>,
 }
@@ -109,7 +110,7 @@ impl PServer {
                 match server.run().join() {
                     Ok(_) => Ok(()),
                     Err(_) => Err(pyo3::exceptions::ConnectionError::py_err(
-                        "Could not start server. Address in use",
+                        "Could not start server. Address in use {:?}",
                     )),
                 }
             }
@@ -134,10 +135,10 @@ impl PServer {
     }
 }
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
-    use pyo3::types::PyDict;
     use pyo3::py_run;
+    use pyo3::types::PyDict;
 
     fn add_module(py: Python, module: &PyModule) -> PyResult<()> {
         py.import("sys")?
@@ -166,5 +167,4 @@ mod tests{
         "#
         );
     }
-
 }

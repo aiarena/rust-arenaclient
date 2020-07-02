@@ -12,7 +12,7 @@ pub enum FromSupervisor {
 /// Response to the supervisor
 pub enum ToSupervisor {}
 
-/// Create one receiver for the game, send connections to players,
+/// Create one receiver for the handler, send connections to players,
 /// and corresponding two-way connections to players
 pub fn create_channels(
     count: usize,
@@ -36,24 +36,24 @@ pub fn create_channels(
     (rx_game, to_player_channels, to_game_channels)
 }
 
-/// Channel from a player to the game
+/// Channel from a player to the handler
 pub struct ChannelToGame {
     player_index: usize,
     tx: Sender<ToGame>,
     rx: Receiver<ToPlayer>,
 }
 impl ChannelToGame {
-    /// Sends a message to the game
+    /// Sends a message to the handler
     pub fn send(&mut self, content: ToGameContent) {
         self.tx
             .send(ToGame {
                 player_index: self.player_index,
                 content,
             })
-            .expect("Unable to send to the game");
+            .expect("Unable to send to the handler");
     }
 
-    /// Receives message from game, nonblocking: None if not available
+    /// Receives message from handler, nonblocking: None if not available
     pub fn recv(&mut self) -> Option<ToPlayer> {
         match self.rx.try_recv() {
             Ok(msg) => Some(msg),
@@ -63,21 +63,21 @@ impl ChannelToGame {
     }
 }
 
-/// Message from a player to the game
+/// Message from a player to the handler
 #[derive(Debug, Clone)]
 pub struct ToGame {
     pub player_index: usize,
     pub content: ToGameContent,
 }
 
-/// Message from a player to the game
+/// Message from a player to the handler
 #[derive(Debug, Clone)]
 pub enum ToGameContent {
     /// Game ended normally
     GameOver((Vec<PlayerResult>, u32, f32)),
     /// SC2 reponded to `leave_game` request
     LeftGame,
-    /// SC2 reponded to `quit` request without the client leaving the game
+    /// SC2 reponded to `quit` request without the client leaving the handler
     QuitBeforeLeave,
     /// SC2 unexpectedly closed connection, usually user clicking the window close button
     SC2UnexpectedConnectionClose,
@@ -85,7 +85,7 @@ pub enum ToGameContent {
     UnexpectedConnectionClose,
 }
 
-/// Channel from the game to a player
+/// Channel from the handler to a player
 #[derive(Clone)]
 pub struct ChannelToPlayer {
     tx: Sender<ToPlayer>,
@@ -93,11 +93,13 @@ pub struct ChannelToPlayer {
 impl ChannelToPlayer {
     /// Sends a message to the player
     pub fn send(&mut self, content: ToPlayer) {
-        self.tx.send(content).expect("Unable to send to the game");
+        self.tx
+            .send(content)
+            .expect("Unable to send to the handler");
     }
 }
 
-/// Message from a player to the game
+/// Message from a player to the handler
 #[derive(Debug, Clone)]
 pub enum ToPlayer {
     /// Game over, kill the client

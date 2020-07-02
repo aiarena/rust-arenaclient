@@ -115,8 +115,8 @@ impl Player {
                 );
                 None
             }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock =>{
-                 warn!(
+            Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {
+                warn!(
                     "Client {:?} stopped responding",
                     self.connection.peer_addr().expect("PeerAddr")
                 );
@@ -208,7 +208,7 @@ impl Player {
             false
         }
     }
-    /// Run game communication loop
+    /// Run handler communication loop
     #[must_use]
     pub fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
         let replay_path = config.replay_path();
@@ -269,7 +269,7 @@ impl Player {
                     self.frame_time
                 };
                 self.process.kill();
-                debug!("Client left the game");
+                debug!("Client left the handler");
                 gamec.send(ToGameContent::LeftGame);
                 return Some(self);
             } else if response.has_observation() {
@@ -328,7 +328,7 @@ impl Player {
                         } else {
                             self.frame_time
                         };
-                        debug!("Killing the process by request from the game");
+                        debug!("Killing the process by request from the handler");
                         self.process.kill();
                         Some(self)
                     }

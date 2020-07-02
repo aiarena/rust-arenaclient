@@ -1,17 +1,17 @@
-use serde::{Deserialize, Serialize};
 use crate::paths::base_dir;
 use csv::ReaderBuilder;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
-pub(crate) struct BuildInfo{
+pub(crate) struct BuildInfo {
     #[serde(default, rename = "Version!STRING:0")]
-    pub(crate) version: String
+    pub(crate) version: String,
 }
 
 impl BuildInfo {
     pub fn new() -> Self {
         Self {
-            version: "".to_string()
+            version: "".to_string(),
         }
     }
     pub fn get_build_info_from_file() -> BuildInfo {
@@ -24,7 +24,7 @@ impl BuildInfo {
 
         for result in rdr.deserialize() {
             if let Ok(x) = result {
-                return x
+                return x;
             }
         }
         BuildInfo::new()
