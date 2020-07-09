@@ -4,8 +4,7 @@
 
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-// use std::collections::HashMap;
-use std::io::ErrorKind::{ConnectionAborted, WouldBlock};
+use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, WouldBlock};
 
 use websocket::message::{Message as ws_Message, OwnedMessage};
 use websocket::result::WebSocketError;
@@ -289,6 +288,7 @@ impl Controller {
                         PlaylistAction::Kick
                     }
                     Err(err) => {
+                        println!("here");
                         println!("Invalid message {:?}", err);
                         PlaylistAction::Kick
                     }
@@ -311,6 +311,7 @@ impl Controller {
                         self.drop_client(i)
                     }
                     PlaylistAction::Respond(resp) => {
+                        println!("Respond");
                         self.clients[i]
                             .1
                             .send_message(&resp)
@@ -321,11 +322,13 @@ impl Controller {
                             .1
                             .send_message(&resp)
                             .expect("Could not respond");
+                        println!("RespondQuit");
                         self.drop_client(i);
                     }
                     PlaylistAction::JoinGame(req) => {
                         // println!("Join handler received");
                         let join_response = self.client_join_game(i, req);
+                        println!("JoinGame");
                         if join_response == None {
                             println!("Game creation / joining failed");
                         }
@@ -333,6 +336,7 @@ impl Controller {
                 },
                 Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {}
                 Err(err) => {
+                    println!("here1");
                     println!("Invalid message {:?}", err);
                     self.drop_client(i);
                 }
@@ -524,9 +528,23 @@ pub fn create_supervisor_listener(
                 break;
             }
             Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
+                sender
+                    .send(SupervisorAction::ForceQuit)
+                    .expect("Could not send ForceQuit");
                 break;
             }
-            Err(e) => println!("Supervisor receive error: {:?}", e),
+            Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionReset => {
+                sender
+                    .send(SupervisorAction::ForceQuit)
+                    .expect("Could not send ForceQuit");
+                break;
+            }
+            Err(e) => {
+                sender
+                    .send(SupervisorAction::ForceQuit)
+                    .expect("Could not send ForceQuit");
+                println!("Supervisor receive error: {:?}", e)
+            }
         }
     });
 }
