@@ -40,68 +40,16 @@ is the supervisor's job. Example of an extremely basic supervisor script in Pyth
 import os, subprocess, asyncio, aiohttp
 from rust_ac import Server
 
-BOTS_DIRECTORY = "c:/location/of/bots"
-BOTS = ["names of", "bots"] # Only two bots at a time
-HOST = "127.0.0.1"
-PORT = "8642"
-
-def start_bot(bot_name):
-    bot_path = os.path.join(BOTS_DIRECTORY, bot_name)
-    bot_file = "run.py" # The bot's start file
-    cmd_line = [
-        "python",
-        bot_file,
-        "--GamePort",
-        PORT,
-        "--StartPort",
-        PORT,
-        "--LadderServer",
-        HOST
-    ] 
-
-    process = subprocess.Popen(
-        " ".join(cmd_line),
-        cwd=(str(bot_path)),
-        shell=False
-    )
-    return process
+from rust_ac.match_runner import MatchRunner
+from rust_ac import GameConfig
 
 
-async def main():
-    # Supervisor
-    session = aiohttp.ClientSession()
-    # Needs "supervisor" header so the proxy knows it's not a bot
-    ws = await session.ws_connect(f"ws://{HOST}:{PORT}/sc2api", headers={"supervisor":"True"})
-    # Sends the handler config after connecting to proxy
-    await ws.send_json({
-                "Map": "AbiogenesisLE", # Map to play on 
-                "MaxGameTime": 60846, # Max time a handler can run before result changes to tie. 
-                                      # Measured in game_loops, which are handler seconds / 22.4
-                "Player1": "BasicBot", # Bot 1 name
-                "Player2": "LoserBot", # Bot 2 name
-                "ReplayPath": r"c:/data/something.SC2Replay", # Path to save replay
-                "MatchID": 123, # Used internally for ai-arena. Can be left out
-                "DisableDebug": True, # Whether to allow debug commands or filter them out
-                "MaxFrameTime": 1000, # Max time in ms a bot can take on one step
-                "Strikes": 10, # How many times a bot can exceed MaxFrameTime before being kicked
-                "RealTime": False, # Run handler in realtime
-                "Visualize": False # Unused currently
-            }
-        )
+m = MatchRunner(bot_directory=r"D:\desktop backup\aiarenaclient\aiarena-client\aiarena-test-bots")
+result = m.run_game(game=GameConfig('AutomatonLE', 'loser_bot', 'MicroMachine'))  # One game
 
-    # bots
-    b = []
-    for bot in BOTS:
-        b.append(start_bot(bot))
-        msg = await ws.receive() # Waits for confirmation that bot connected
-        continue
-    
-    result = await ws.receive() # Receives result from proxy after handler finishes
+games = [GameConfig('AutomatonLE', 'loser_bot', 'basic_bot') for _ in range(20)]
 
-if __name__ == "__main__":
-    server = Server(f"{HOST}:{PORT}")
-    server.run()
-    asyncio.get_event_loop().run_until_complete(main())
+results = m.run_games_multiple(games=games, instances=3)  # Multiple games - Run 3 games at a time
 ```
 
 ## Contributing

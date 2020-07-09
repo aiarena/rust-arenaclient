@@ -72,5 +72,4 @@ class MatchRunner:
 
 if __name__ == "__main__":
     m = MatchRunner(r"D:\desktop backup\aiarenaclient\aiarena-client\aiarena-test-bots")
-    # exit(1)
     print(m.run_game(GameConfig('AutomatonLE', 'loser_bot', 'basic_bot')))
