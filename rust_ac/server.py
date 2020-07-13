@@ -9,11 +9,11 @@ class Server:
     """
     def __init__(self, ip_addr: str):
         self.ip_address: str = ip_addr
-        self.server = PServer(ip_addr)
+        self._server = PServer(ip_addr)
         self.process: Process = ...
 
     def run(self):
-        self.process = Process(target=self.server.run)
+        self.process = Process(target=self._server.run)
         self.process.daemon = True
         self.process.start()
 

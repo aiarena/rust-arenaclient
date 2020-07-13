@@ -12,10 +12,10 @@ class Result:
             self.map = match_config.map_name
             self.replay_path = match_config.replay_name
         else:
-            self.match_id = match.id
-            self.bot1 = match.bot1.name
-            self.bot2 = match.bot2.name
-            self.map = match.map_name
+            self.match_id = match_config.id
+            self.bot1 = match_config.bot1.name
+            self.bot2 = match_config.bot2.name
+            self.map = match_config.map_name
             self._config = cfg
             self.replay_path = None
 
