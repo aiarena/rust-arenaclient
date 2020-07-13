@@ -128,6 +128,10 @@ class Supervisor:
         await self._cleanup()
         return result
 
+    async def reset(self):
+        await self._websocket.send_str("Reset")
+        _ = await self._websocket.receive()  # Receive confirmation
+
 
 
 
