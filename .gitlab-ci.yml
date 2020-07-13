@@ -37,26 +37,6 @@ before_script:
  - apt-get install -yqq --no-install-recommends xz-utils
  - apt-get install -yqq --no-install-recommends unzip
  - apt-get install -yqq --no-install-recommends libssl-dev
-#   Install python libs
- - python3 --version
- - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
- - python3 get-pip.py
- - pip3 install cffi virtualenv
- - virtualenv venv
- - source venv/bin/activate
- - pip3 install maturin
- - pip3 install burnysc2
-#   Install protoc
- - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
- - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
- - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
- - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
- - rm -f $PROTOC_ZIP
-#   Install Rust
- - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
- - source $HOME/.cargo/env
- - rustup toolchain install stable
- - rustup default stable
 #   #Download SC2 # Skip until it's fixed
 # - DIR=StarCraftII/
 # - if ! [ -d "$DIR" ]; then echo "Download" \
@@ -100,7 +80,26 @@ before_script:
 build:
  stage: build
  script:
-  - maturin build
+#   Install python libs
+   - curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+   - python3 get-pip.py
+   - pip3 install cffi virtualenv
+   - virtualenv venv
+   - source venv/bin/activate
+   - pip3 install maturin
+   - pip3 install burnysc2
+   #   Install protoc
+   - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
+   - curl --insecure -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
+   - unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
+   - unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+   - rm -f $PROTOC_ZIP
+   #   Install Rust
+   - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+   - source $HOME/.cargo/env
+   - rustup toolchain install stable
+   - rustup default stable
+   - maturin build
  artifacts:
     paths:
      - "target/wheels/*.whl"
