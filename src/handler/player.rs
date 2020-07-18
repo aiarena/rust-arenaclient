@@ -9,7 +9,7 @@ use websocket::result::WebSocketError;
 use websocket::OwnedMessage;
 
 use protobuf::parse_from_bytes;
-use protobuf::{Message, RepeatedField};
+use protobuf::{Message};
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 
 use super::messaging::{ChannelToGame, ToGameContent, ToPlayer};
@@ -211,6 +211,11 @@ impl Player {
     /// Run handler communication loop
     #[must_use]
     pub fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
+        let mut debug_response = Response::new();
+        debug_response.set_id(0);
+        debug_response.set_status(Status::in_game);
+
+
         let replay_path = config.replay_path();
         let mut start_timer = false;
         let mut frame_time = 0_f32;
@@ -222,11 +227,11 @@ impl Player {
             }
             // Check for debug requests
             if config.disable_debug() && req.has_debug() {
-                let mut response = Response::new();
-                response.set_error(RepeatedField::from_vec(vec![
-                    "Proxy: Request denied".to_owned()
-                ]));
-                self.client_respond(&response);
+                // response.set_error(RepeatedField::from_vec(vec![
+                //     "Proxy: Request denied".to_owned()
+                // ]));
+                self.client_respond(&debug_response);
+                continue
             }
 
             // Send request to SC2 and get response
