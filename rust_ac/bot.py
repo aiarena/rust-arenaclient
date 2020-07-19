@@ -5,7 +5,8 @@ import os
 import platform
 import sys
 import re
-from subprocess import Popen, STDOUT, CREATE_NEW_PROCESS_GROUP, call
+from subprocess import Popen, STDOUT, call
+import subprocess
 
 
 class BotTypeError(Exception):
@@ -130,7 +131,7 @@ class Bot:
                     cwd=(str(bot_folder.as_posix())),
                     shell=True if is_linux else False,
                     preexec_fn=os.setpgrp if is_linux else None,
-                    creationflags=None if is_linux else CREATE_NEW_PROCESS_GROUP,
+                    creationflags=None if is_linux else subprocess.CREATE_NEW_PROCESS_GROUP,
                 )
                 self.process = process
 
