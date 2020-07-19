@@ -66,6 +66,7 @@ impl RustServer {
                     }
                     SupervisorAction::Config(config) => {
                         controller.set_config(config);
+                        controller.send_message("{\"Config\": \"Received\"}");
                     }
                     SupervisorAction::ForceQuit => break,
                     _ => {}

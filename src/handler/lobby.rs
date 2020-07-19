@@ -45,12 +45,15 @@ impl GameLobby {
     }
 
     /// Add a new client to the handler
-    pub fn join(&mut self, connection: Client, join_req: RequestJoinGame, client_name: String) {
+    pub fn join(&mut self, connection: Client, join_req: RequestJoinGame, client_name: String, must_join: bool) {
         let mut pd = PlayerData::from_join_request(join_req);
         pd.name = Some(client_name);
-        // println!("{:?},{:?}", connection.peer_addr(), client_name);
-        self.player_handles.push(Player::new(connection, pd))
-        // self.players.push(Player::new(connection, pd));
+        if must_join{
+            self.players.push(Player::new_no_thread(connection, pd))
+        }
+        else {
+            self.player_handles.push(Player::new(connection, pd))
+        }
     }
 
     /// Protobuf to create a new handler

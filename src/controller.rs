@@ -78,6 +78,7 @@ pub struct Controller {
     game: Option<GameHandle>,
     /// Connected Clients
     pub connected_clients: usize,
+    light_mode: bool
 }
 
 impl Default for Controller {
@@ -97,6 +98,7 @@ impl Controller {
             lobby: None,
             game: None,
             connected_clients: 0,
+            light_mode: false
         }
     }
     /// Reset Controller for new handler
@@ -189,7 +191,9 @@ impl Controller {
         }
     }
     pub fn set_config(&mut self, config: String) {
-        self.config = Some(Config::load_from_str(&config))
+        let config = Config::load_from_str(&config);
+        self.light_mode = config.light_mode();
+        self.config = Some(config)
     }
 
     /// Remove client from playlist, closing the connection
@@ -238,13 +242,13 @@ impl Controller {
 
         if self.lobby.is_some() {
             let mut lobby = self.lobby.take().unwrap();
-            lobby.join(client, req, client_name);
+            lobby.join(client, req, client_name, self.light_mode);
             lobby.join_player_handles();
             let game = lobby.start()?;
             self.game = Some(spawn_game(game));
         } else if self.create_lobby() {
             let lobby = self.lobby.as_mut().unwrap();
-            lobby.join(client, req, client_name);
+            lobby.join(client, req, client_name, self.light_mode);
         } else {
             println!("Could not create lobby");
         }

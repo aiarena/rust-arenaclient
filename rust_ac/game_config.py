@@ -8,7 +8,9 @@ class GameConfig:
                  player2=None,
                  disable_debug=True,
                  replay_name="",
-                 real_time=False, max_game_time=60486):
+                 real_time=False,
+                 max_game_time=60486,
+                 light_mode=False):
         self.map_name = map_name
         self.player1 = player1
         self.player2 = player2
@@ -16,6 +18,7 @@ class GameConfig:
         self.real_time = real_time
         self.replay_name = replay_name
         self.max_game_time = max_game_time
+        self.light_mode = light_mode
 
     def to_json(self):
         return dumps({
@@ -27,4 +30,5 @@ class GameConfig:
             "MatchID": 0,
             "DisableDebug": self.disable_debug,
             "RealTime": self.real_time,
+            "LightMode": self.light_mode
         })

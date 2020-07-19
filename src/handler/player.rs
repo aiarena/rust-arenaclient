@@ -57,6 +57,19 @@ impl Player {
             }
         })
     }
+    pub fn new_no_thread(connection: Client, data: PlayerData) ->Self{
+        let process = Process::new();
+        let sc2_ws = process.connect().expect("Could not connect");
+        Self {
+            process,
+            sc2_ws,
+            connection,
+            sc2_status: None,
+            game_loops: 0,
+            data,
+            frame_time: 0_f32,
+        }
+    }
     pub fn player_name(&self) -> Option<String> {
         self.data.name.clone()
     }

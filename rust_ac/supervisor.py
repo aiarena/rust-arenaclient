@@ -86,12 +86,19 @@ class Supervisor:
         await self.connect()
         if not self._websocket or not self._session:
             raise ConnectionError("Please call .connect() before starting game")
-        await self._send_config()
 
         msg = await self._websocket.receive()
         if msg.type == WSMsgType.CLOSED:
             raise ConnectionError("Server sent a CLOSED message")
         if msg.json().get("Status") == "Connected":
+            print("Connected to proxy.")
+        await self._send_config()
+
+        msg = await self._websocket.receive()
+
+        if msg.type == WSMsgType.CLOSED:
+            raise ConnectionError("Server sent a CLOSED message")
+        if msg.json().get("Config") == "Received":
             print("Config successfully sent. Bots can be started")
 
     async def _wait_for_result(self) -> Result:

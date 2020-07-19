@@ -41,6 +41,8 @@ pub struct Config {
     pub(crate) real_time: bool,
     #[serde(default, alias = "Visualize")]
     pub(crate) visualize: bool,
+    #[serde(default, alias ="LightMode")]
+    pub(crate) light_mode: bool
 }
 impl Config {
     /// New default config
@@ -73,5 +75,8 @@ impl Config {
     }
     pub fn replay_path(&self) -> String {
         self.replay_path.clone()
+    }
+    pub fn light_mode(&self) -> bool{
+        self.light_mode
     }
 }
