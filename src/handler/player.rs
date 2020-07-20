@@ -1,5 +1,4 @@
 //! Bot player participant
-
 use log::{debug, error, trace, warn};
 use std::fmt;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
@@ -8,7 +7,7 @@ use std::time::Instant;
 use websocket::result::WebSocketError;
 use websocket::OwnedMessage;
 
-use protobuf::parse_from_bytes;
+use protobuf::{parse_from_bytes, Clear};
 use protobuf::{Message};
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 
@@ -89,6 +88,15 @@ impl Player {
             r.write_to_bytes().expect("Invalid protobuf message"),
         ));
     }
+    pub fn client_respond_raw(&mut self, r: Vec<u8>) {
+        trace!(
+            "Response to client: [{}]",
+            format!("{:?}", r).chars().take(100).collect::<String>()
+        );
+        self.client_send(&OwnedMessage::Binary(
+            r,
+        ));
+    }
 
     /// Receive a message from the client
     /// Returns None if the connection is already closed
@@ -141,13 +149,20 @@ impl Player {
 
     /// Get a protobuf request from the client
     /// Returns None if the connection is already closed
-    #[must_use]
     pub fn client_get_request(&mut self) -> Option<Request> {
         match self.client_recv()? {
             OwnedMessage::Binary(bytes) => {
                 let resp = parse_from_bytes::<Request>(&bytes).expect("Invalid protobuf message");
                 Some(resp)
             }
+            OwnedMessage::Close(_) => None,
+            other => panic!("Expected binary message, got {:?}", other),
+        }
+    }
+
+    pub fn client_get_request_raw(&mut self) -> Option<Vec<u8>>{
+        match self.client_recv()? {
+            OwnedMessage::Binary(bytes)=> Some(bytes),
             OwnedMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
@@ -162,16 +177,17 @@ impl Player {
 
     /// Send protobuf request to sc2
     /// Returns None if the connection is already closed
-    #[must_use]
     pub fn sc2_request(&mut self, r: Request) -> Option<()> {
         self.sc2_send(&OwnedMessage::Binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
         ))
     }
+    pub fn sc2_request_raw(&mut self, r: Vec<u8>) -> Option<()> {
+        self.sc2_send(&OwnedMessage::Binary(r))
+    }
 
     /// Wait and receive a protobuf request from sc2
     /// Returns None if the connection is already closed
-    #[must_use]
     pub fn sc2_recv(&mut self) -> Option<Response> {
         match self.sc2_ws.recv_message().ok()? {
             OwnedMessage::Binary(bytes) => {
@@ -181,13 +197,25 @@ impl Player {
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
+    pub fn sc2_recv_raw(&mut self) -> Option<Vec<u8>> {
+        match self.sc2_ws.recv_message().ok()? {
+            OwnedMessage::Binary(bytes) => {
+                Some(bytes)
+            }
+            OwnedMessage::Close(_) => None,
+            other => panic!("Expected binary message, got {:?}", other),
+        }
+    }
 
     /// Send a request to SC2 and return the reponse
     /// Returns None if the connection is already closed
-    #[must_use]
     pub fn sc2_query(&mut self, r: Request) -> Option<Response> {
         self.sc2_request(r)?;
         self.sc2_recv()
+    }
+    pub fn sc2_query_raw(&mut self, r: Vec<u8>) -> Option<Vec<u8>>{
+        self.sc2_request_raw(r)?;
+        self.sc2_recv_raw()
     }
     /// Saves replay to path
     pub fn save_replay(&mut self, path: String) -> bool {
@@ -227,6 +255,8 @@ impl Player {
         let mut debug_response = Response::new();
         debug_response.set_id(0);
         debug_response.set_status(Status::in_game);
+        let mut response = Response::new();
+        let mut req = Request::new();
 
 
         let replay_path = config.replay_path();
@@ -234,21 +264,21 @@ impl Player {
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
         // Get request
-        while let Some(req) = self.client_get_request() {
+        while let Some(req_raw) = self.client_get_request_raw() {
+            req.clear();
+            req.merge_from_bytes(&req_raw).ok()?;
+
             if start_timer {
                 frame_time += start_time.elapsed().as_secs_f32();
             }
             // Check for debug requests
             if config.disable_debug() && req.has_debug() {
-                // response.set_error(RepeatedField::from_vec(vec![
-                //     "Proxy: Request denied".to_owned()
-                // ]));
                 self.client_respond(&debug_response);
                 continue
             }
 
             // Send request to SC2 and get response
-            let response = match self.sc2_query(req) {
+            let response_raw = match self.sc2_query_raw(req_raw) {
                 Some(d) => d,
                 None => {
                     error!("SC2 unexpectedly closed the connection");
@@ -258,10 +288,13 @@ impl Player {
                     return Some(self);
                 }
             };
+
+            response.clear();
+            response.merge_from_bytes(&response_raw).ok()?;
             self.sc2_status = Some(response.get_status());
 
             // Send SC2 response to client
-            self.client_respond(&response);
+            self.client_respond_raw(response_raw);
             start_timer = true;
             start_time = Instant::now();
 
@@ -386,7 +419,7 @@ impl PlayerData {
     pub fn from_join_request(req: RequestJoinGame) -> Self {
         Self {
             race: Race::from_proto(req.get_race()),
-            name: if req.has_player_name() {
+            name: if  req.has_player_name() {
                 Some(req.get_player_name().to_owned())
             } else {
                 None
@@ -394,8 +427,22 @@ impl PlayerData {
             ifopts: {
                 let mut ifopts = req.get_options().clone();
                 ifopts.set_raw_affects_selection(true);
+                ifopts.set_raw_crop_to_playable_area(false);
+                println!("{:?}", ifopts);
                 ifopts
             },
         }
     }
+}
+#[derive(Debug, Copy, Clone)]
+pub enum Visibility {
+	Hidden,
+	Fogged,
+	Visible,
+	FullHidden,
+}
+impl Default for Visibility {
+	fn default() -> Self {
+		Visibility::Hidden
+	}
 }

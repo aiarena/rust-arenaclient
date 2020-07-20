@@ -277,8 +277,8 @@ impl Controller {
                         let mut pong = sc2_proto::sc2api::ResponsePing::new();
                         let b = BuildInfo::get_build_info_from_file();
                         pong.set_game_version(b.version);
-                        pong.set_base_build(0);
-                        pong.set_data_build(0);
+                        pong.set_base_build(b.base_build);
+                        pong.set_data_build(b.data_build);
                         pong.set_data_version("".to_string());
                         resp.set_ping(pong);
                         PlaylistAction::respond(resp)
@@ -330,7 +330,6 @@ impl Controller {
                         self.drop_client(i);
                     }
                     PlaylistAction::JoinGame(req) => {
-                        // println!("Join handler received");
                         let join_response = self.client_join_game(i, req);
                         println!("JoinGame");
                         if join_response == None {

@@ -81,6 +81,7 @@ mod tests {
             disable_debug: true,
             real_time: false,
             visualize: false,
+            light_mode: false
         };
         supervisor.send_message(&Message::text(serde_json::to_string(&config).unwrap()));
         start_bot("/aiarena-test-bots-master/loser_bot".parse().unwrap());
