@@ -286,6 +286,15 @@ impl Player {
                     self.frame_time
                 };
             }
+            if req.has_leave_game(){
+                self.save_replay(replay_path.clone());
+                self.frame_time = frame_time / self.game_loops as f32;
+                self.frame_time = if self.frame_time.is_nan() {
+                    0_f32
+                } else {
+                    self.frame_time
+                };
+            }
 
             // Send request to SC2 and get response
             let mut response_raw = match self.sc2_query_raw(req_raw) {
