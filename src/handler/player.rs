@@ -7,8 +7,8 @@ use std::time::Instant;
 use websocket::result::WebSocketError;
 use websocket::OwnedMessage;
 
+use protobuf::Message;
 use protobuf::{parse_from_bytes, Clear};
-use protobuf::{Message};
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 
 use super::messaging::{ChannelToGame, ToGameContent, ToPlayer};
@@ -20,6 +20,7 @@ use std::fs::File;
 use std::io::Write;
 use std::thread;
 use std::thread::JoinHandle;
+// use sc2_proto::common::Size2DI;
 
 /// Player process, connection and details
 pub struct Player {
@@ -37,6 +38,8 @@ pub struct Player {
     pub game_loops: u32,
     /// Frame time
     pub frame_time: f32,
+    /// Player id
+    pub player_id: Option<u32>,
 }
 
 impl Player {
@@ -53,10 +56,11 @@ impl Player {
                 game_loops: 0,
                 data,
                 frame_time: 0_f32,
+                player_id: None,
             }
         })
     }
-    pub fn new_no_thread(connection: Client, data: PlayerData) ->Self{
+    pub fn new_no_thread(connection: Client, data: PlayerData) -> Self {
         let process = Process::new();
         let sc2_ws = process.connect().expect("Could not connect");
         Self {
@@ -67,6 +71,7 @@ impl Player {
             game_loops: 0,
             data,
             frame_time: 0_f32,
+            player_id: None,
         }
     }
     pub fn player_name(&self) -> Option<String> {
@@ -93,9 +98,7 @@ impl Player {
             "Response to client: [{}]",
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
-        self.client_send(&OwnedMessage::Binary(
-            r,
-        ));
+        self.client_send(&OwnedMessage::Binary(r));
     }
 
     /// Receive a message from the client
@@ -160,9 +163,9 @@ impl Player {
         }
     }
 
-    pub fn client_get_request_raw(&mut self) -> Option<Vec<u8>>{
+    pub fn client_get_request_raw(&mut self) -> Option<Vec<u8>> {
         match self.client_recv()? {
-            OwnedMessage::Binary(bytes)=> Some(bytes),
+            OwnedMessage::Binary(bytes) => Some(bytes),
             OwnedMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
@@ -199,9 +202,7 @@ impl Player {
     }
     pub fn sc2_recv_raw(&mut self) -> Option<Vec<u8>> {
         match self.sc2_ws.recv_message().ok()? {
-            OwnedMessage::Binary(bytes) => {
-                Some(bytes)
-            }
+            OwnedMessage::Binary(bytes) => Some(bytes),
             OwnedMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
@@ -213,7 +214,7 @@ impl Player {
         self.sc2_request(r)?;
         self.sc2_recv()
     }
-    pub fn sc2_query_raw(&mut self, r: Vec<u8>) -> Option<Vec<u8>>{
+    pub fn sc2_query_raw(&mut self, r: Vec<u8>) -> Option<Vec<u8>> {
         self.sc2_request_raw(r)?;
         self.sc2_recv_raw()
     }
@@ -258,11 +259,11 @@ impl Player {
         let mut response = Response::new();
         let mut req = Request::new();
 
-
         let replay_path = config.replay_path();
         let mut start_timer = false;
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
+
         // Get request
         while let Some(req_raw) = self.client_get_request_raw() {
             req.clear();
@@ -273,12 +274,21 @@ impl Player {
             }
             // Check for debug requests
             if config.disable_debug() && req.has_debug() {
+                debug_response.set_id(req.get_id());
                 self.client_respond(&debug_response);
-                continue
+                continue;
+            } else if req.has_leave_game() {
+                self.save_replay(replay_path.clone());
+                self.frame_time = frame_time / self.game_loops as f32;
+                self.frame_time = if self.frame_time.is_nan() {
+                    0_f32
+                } else {
+                    self.frame_time
+                };
             }
 
             // Send request to SC2 and get response
-            let response_raw = match self.sc2_query_raw(req_raw) {
+            let mut response_raw = match self.sc2_query_raw(req_raw) {
                 Some(d) => d,
                 None => {
                     error!("SC2 unexpectedly closed the connection");
@@ -292,6 +302,14 @@ impl Player {
             response.clear();
             response.merge_from_bytes(&response_raw).ok()?;
             self.sc2_status = Some(response.get_status());
+            if response.has_game_info() {
+                for pi in response.mut_game_info().mut_player_info().iter_mut() {
+                    if pi.get_player_id() != self.player_id.unwrap() {
+                        pi.clear_race_actual();
+                    }
+                }
+                response_raw = response.write_to_bytes().unwrap();
+            }
 
             // Send SC2 response to client
             self.client_respond_raw(response_raw);
@@ -310,18 +328,6 @@ impl Player {
                 gamec.send(ToGameContent::QuitBeforeLeave);
                 debug!("Waiting for the process");
                 self.process.wait();
-                return Some(self);
-            } else if response.has_leave_game() {
-                self.save_replay(replay_path);
-                self.frame_time = frame_time / self.game_loops as f32;
-                self.frame_time = if self.frame_time.is_nan() {
-                    0_f32
-                } else {
-                    self.frame_time
-                };
-                self.process.kill();
-                debug!("Client left the handler");
-                gamec.send(ToGameContent::LeftGame);
                 return Some(self);
             } else if response.has_observation() {
                 self.frame_time = frame_time / self.game_loops as f32;
@@ -416,19 +422,17 @@ pub struct PlayerData {
     pub ifopts: sc2_proto::sc2api::InterfaceOptions,
 }
 impl PlayerData {
-    pub fn from_join_request(req: RequestJoinGame) -> Self {
+    pub fn from_join_request(req: RequestJoinGame, archon: bool) -> Self {
         Self {
             race: Race::from_proto(req.get_race()),
-            name: if  req.has_player_name() {
+            name: if req.has_player_name() {
                 Some(req.get_player_name().to_owned())
             } else {
                 None
             },
             ifopts: {
                 let mut ifopts = req.get_options().clone();
-                ifopts.set_raw_affects_selection(true);
-                ifopts.set_raw_crop_to_playable_area(false);
-                println!("{:?}", ifopts);
+                ifopts.set_raw_affects_selection(!archon);
                 ifopts
             },
         }
@@ -436,13 +440,13 @@ impl PlayerData {
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Visibility {
-	Hidden,
-	Fogged,
-	Visible,
-	FullHidden,
+    Hidden,
+    Fogged,
+    Visible,
+    FullHidden,
 }
 impl Default for Visibility {
-	fn default() -> Self {
-		Visibility::Hidden
-	}
+    fn default() -> Self {
+        Visibility::Hidden
+    }
 }
