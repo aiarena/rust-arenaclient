@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
-
+mod race;
+use crate::config::race::BotRace;
+use crate::sc2::Race;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -41,8 +43,16 @@ pub struct Config {
     pub(crate) real_time: bool,
     #[serde(default, alias = "Visualize")]
     pub(crate) visualize: bool,
-    #[serde(default, alias ="LightMode")]
-    pub(crate) light_mode: bool
+    #[serde(default, alias = "LightMode")]
+    pub(crate) light_mode: bool,
+    #[serde(default, alias = "ValidateRace")]
+    pub(crate) validate_race: bool,
+    #[serde(default, alias = "Player1Race")]
+    pub(crate) player1_race: Option<String>,
+    #[serde(default, alias = "Player2Race")]
+    pub(crate) player2_race: Option<String>,
+    #[serde(default, alias = "Archon")]
+    pub(crate) archon: bool,
 }
 impl Config {
     /// New default config
@@ -76,7 +86,58 @@ impl Config {
     pub fn replay_path(&self) -> String {
         self.replay_path.clone()
     }
-    pub fn light_mode(&self) -> bool{
+    pub fn light_mode(&self) -> bool {
         self.light_mode
+    }
+    pub fn validate_race(&self) -> bool {
+        self.validate_race
+    }
+    pub fn player1_race(&self) -> Option<String> {
+        self.player1_race.clone()
+    }
+    pub fn player1_bot_race(&self) -> Option<Race> {
+        match self.player1_race.clone() {
+            Some(string) => Some(BotRace::from_str(&*string).to_race()),
+            None => None,
+        }
+    }
+    pub fn player2_race(&self) -> Option<String> {
+        self.player2_race.clone()
+    }
+    pub fn player2_bot_race(&self) -> Option<Race> {
+        match self.player2_race.clone() {
+            Some(string) => Some(BotRace::from_str(&*string).to_race()),
+            None => None,
+        }
+    }
+    pub fn archon(&self)-> bool{ self.archon }
+}
+
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+    fn string_config() -> &'static str {
+        "{\"Map\": \"AutomatonLE\",\
+        \"MaxGameTime\":10,\
+        \"Player1\":\"Bot1\",\
+        \"Player2\":\"Bot2\",\
+        \"ReplayPath\":\"c:\\random_path\",\
+        \"MatchID\":10,\
+        \"DisableDebug\":true,\
+        \"MaxFrameTime\":20,\
+        \"Strikes\":10,\
+        \"RealTime\":false,\
+        \"Visualize\":false,\
+        \"ValidateRace\":true,\
+        \"Player1Race\":\"random\",\
+        \"Player2Race\":\"t\"}"
+
+    }
+    #[test]
+    fn test_load_from_str(){
+        let str_config = string_config();
+        let config = Config::load_from_str(&*str_config);
+        assert_eq!(config.map(), "AutomatonLE");
     }
 }

@@ -6,11 +6,10 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct BuildInfo {
     #[serde(default, rename = "Version!STRING:0")]
     pub(crate) version: String,
-    #[serde(skip_deserializing )]
+    #[serde(skip_deserializing)]
     pub(crate) base_build: u32,
-    #[serde(skip_deserializing )]
-    pub(crate) data_build: u32
-
+    #[serde(skip_deserializing)]
+    pub(crate) data_build: u32,
 }
 
 impl BuildInfo {
@@ -18,7 +17,7 @@ impl BuildInfo {
         Self {
             version: "".to_string(),
             base_build: 0,
-            data_build: 0
+            data_build: 0,
         }
     }
     pub fn get_build_info_from_file() -> BuildInfo {
@@ -33,11 +32,13 @@ impl BuildInfo {
         for result in rdr.deserialize::<BuildInfo>() {
             if let Ok(x) = result {
                 build_info = x;
-                build_info.base_build = build_info.version
+                build_info.base_build = build_info
+                    .version
                     .split('.')
                     .last()
                     .unwrap()
-                    .parse::<u32>().unwrap();
+                    .parse::<u32>()
+                    .unwrap();
                 build_info.data_build = build_info.base_build;
                 return build_info;
             }

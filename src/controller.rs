@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::handler::{spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle};
 use crate::proxy::Client;
 use crate::result::JsonResult;
+use crate::sc2::Race;
 use crossbeam::channel::{Receiver, Sender};
 use protobuf::Message;
 use sc2_proto::{self, sc2api::RequestJoinGame};
@@ -61,11 +62,13 @@ impl GameId {
     }
 }
 
+pub type BotData = (String, Option<Race>);
+
 /// Controller manages a pool of games and client waiting for games
 pub struct Controller {
     /// Connections (in non-blocking mode) waiting for a handler
     /// If a handler join is requested is pending (with remote), then also contains that
-    clients: Vec<(String, Client, Option<RequestJoinGame>)>,
+    clients: Vec<(BotData, Client, Option<RequestJoinGame>)>,
     /// Supervisor channel writer
     supervisor: Option<Writer<TcpStream>>,
     /// Supervisor channel receiver
@@ -78,7 +81,7 @@ pub struct Controller {
     game: Option<GameHandle>,
     /// Connected Clients
     pub connected_clients: usize,
-    light_mode: bool
+    light_mode: bool,
 }
 
 impl Default for Controller {
@@ -98,7 +101,7 @@ impl Controller {
             lobby: None,
             game: None,
             connected_clients: 0,
-            light_mode: false
+            light_mode: false,
         }
     }
     /// Reset Controller for new handler
@@ -150,17 +153,33 @@ impl Controller {
         match self.config.clone() {
             Some(config) => {
                 if self.connected_clients == 0 {
-                    self.clients.push((config.player1(), client, None));
-                    println!("{:?}", config.player1());
+                    self.clients.push((
+                        (config.player1(), config.player1_bot_race()),
+                        client,
+                        None,
+                    ));
+                    println!(
+                        "{:?} playing {:?}",
+                        config.player1(),
+                        config.player1_bot_race()
+                    );
                     self.connected_clients += 1;
                 } else {
-                    self.clients.push((config.player2(), client, None));
+                    self.clients.push((
+                        (config.player2(), config.player2_bot_race()),
+                        client,
+                        None,
+                    ));
                     self.connected_clients += 1;
-                    println!("{:?}", config.player2());
+                    println!(
+                        "{:?} playing {:?}",
+                        config.player2(),
+                        config.player2_bot_race()
+                    );
                 }
             }
             None => {
-                println!("Config not set");
+                panic!("Config not set");
             }
         }
     }
@@ -227,7 +246,7 @@ impl Controller {
     /// If handler join fails, drops connection
     #[must_use]
     fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
-        let (client_name, client, old_req) = self.clients.remove(index);
+        let ((client_name, client_race), client, old_req) = self.clients.remove(index);
 
         if old_req != None {
             println!("Client attempted to join a handler twice (dropping connection)");
@@ -242,13 +261,13 @@ impl Controller {
 
         if self.lobby.is_some() {
             let mut lobby = self.lobby.take().unwrap();
-            lobby.join(client, req, client_name, self.light_mode);
+            lobby.join(client, req, (client_name, client_race), self.light_mode);
             lobby.join_player_handles();
             let game = lobby.start()?;
             self.game = Some(spawn_game(game));
         } else if self.create_lobby() {
             let lobby = self.lobby.as_mut().unwrap();
-            lobby.join(client, req, client_name, self.light_mode);
+            lobby.join(client, req, (client_name, client_race), self.light_mode);
         } else {
             println!("Could not create lobby");
         }

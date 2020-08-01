@@ -13,6 +13,7 @@ use crate::proxy::Client;
 use super::game::Game;
 use super::player::{Player, PlayerData};
 use crate::config::Config;
+use crate::sc2::Race;
 
 /// An unstarted handler
 #[derive(Debug)]
@@ -45,13 +46,21 @@ impl GameLobby {
     }
 
     /// Add a new client to the handler
-    pub fn join(&mut self, connection: Client, join_req: RequestJoinGame, client_name: String, must_join: bool) {
-        let mut pd = PlayerData::from_join_request(join_req);
-        pd.name = Some(client_name);
-        if must_join{
-            self.players.push(Player::new_no_thread(connection, pd))
+    pub fn join(
+        &mut self,
+        connection: Client,
+        join_req: RequestJoinGame,
+        client_data: (String, Option<Race>),
+        must_join: bool,
+    ) {
+        let mut pd = PlayerData::from_join_request(join_req, self.config.archon());
+        if self.config.validate_race() && client_data.1.is_some() {
+            pd.race = client_data.1.unwrap();
         }
-        else {
+        pd.name = Some(client_data.0);
+        if must_join {
+            self.players.push(Player::new_no_thread(connection, pd))
+        } else {
             self.player_handles.push(Player::new(connection, pd))
         }
     }
@@ -153,6 +162,7 @@ impl GameLobby {
             let response = player.sc2_recv()?;
             assert!(response.has_join_game());
             let resp_join_game = response.get_join_game();
+            player.player_id = Some(resp_join_game.get_player_id());
             if resp_join_game.has_error() {
                 error!("Could not join handler: {:?}", resp_join_game.get_error());
                 return None;
@@ -194,7 +204,6 @@ impl GameLobby {
 }
 
 /// Used to pass player setup info to CreateGame
-// #[allow(dead_code)]
 enum CreateGamePlayer {
     Participant,
     Observer,
