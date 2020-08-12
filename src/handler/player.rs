@@ -263,6 +263,7 @@ impl Player {
         let mut start_timer = false;
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
+        let mut surrender = false;
 
         // Get request
         while let Some(req_raw) = self.client_get_request_raw() {
@@ -278,29 +279,14 @@ impl Player {
                 self.client_respond(&debug_response);
                 continue;
             } else if req.has_leave_game() {
-                self.save_replay(replay_path.clone());
-                self.frame_time = frame_time / self.game_loops as f32;
-                self.frame_time = if self.frame_time.is_nan() {
-                    0_f32
-                } else {
-                    self.frame_time
-                };
-            }
-            if req.has_leave_game(){
-                self.save_replay(replay_path.clone());
-                self.frame_time = frame_time / self.game_loops as f32;
-                self.frame_time = if self.frame_time.is_nan() {
-                    0_f32
-                } else {
-                    self.frame_time
-                };
+                surrender = true;
             }
 
             // Send request to SC2 and get response
             let mut response_raw = match self.sc2_query_raw(req_raw) {
                 Some(d) => d,
                 None => {
-                    error!("SC2 unexpectedly closed the connection");
+                    println!("SC2 unexpectedly closed the connection");
                     gamec.send(ToGameContent::SC2UnexpectedConnectionClose);
                     debug!("Killing the process");
                     self.process.kill();
@@ -382,6 +368,8 @@ impl Player {
                     self.process.kill();
                     return Some(self);
                 }
+            }else if surrender{
+                    self.save_replay(replay_path.clone());
             }
 
             if let Some(msg) = gamec.recv() {
@@ -403,8 +391,21 @@ impl Player {
         }
 
         // Connection already closed
+        // Populate result if bot has left the game, otherwise it will show as
+        // a crash
+        if surrender{
+            let mut results: Vec<PlayerResult> = vec![PlayerResult::Victory; 2];
+            results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Defeat;
+            gamec.send(ToGameContent::GameOver((
+                        results,
+                        self.game_loops,
+                        self.frame_time,
+                    )));
+            self.process.kill();
+            return Some(self);
+        }
         gamec.send(ToGameContent::UnexpectedConnectionClose);
-        debug!("Killing process after unexpected connection close");
+        println!("Killing process after unexpected connection close (Crash)");
         self.process.kill();
         Some(self)
     }
