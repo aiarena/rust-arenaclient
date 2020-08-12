@@ -1,5 +1,5 @@
 //! Bot player participant
-use log::{debug, error, trace, warn};
+use log::{debug, trace, warn};
 use std::fmt;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::time::Instant;
@@ -20,7 +20,6 @@ use std::fs::File;
 use std::io::Write;
 use std::thread;
 use std::thread::JoinHandle;
-// use sc2_proto::common::Size2DI;
 
 /// Player process, connection and details
 pub struct Player {
@@ -300,7 +299,7 @@ impl Player {
             if response.has_game_info() {
                 for pi in response.mut_game_info().mut_player_info().iter_mut() {
                     if pi.get_player_id() != self.player_id.unwrap() {
-                        pi.clear_race_actual();
+                        pi.race_actual = pi.race_requested;
                     }
                 }
                 response_raw = response.write_to_bytes().unwrap();
