@@ -1,4 +1,3 @@
-[![Quality Gate Status](https://sonar.m1nd.io/api/project_badges/measure?project=rust-arenaclient&metric=alert_status)](https://sonar.m1nd.io/dashboard?id=rust-arenaclient)
 # rust-arenaclient
 
 rust-arenaclient was created for [ai-arena](https://ai-arena.net/) to act as a proxy between 
