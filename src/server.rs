@@ -110,12 +110,12 @@ impl PServer {
                 println!("Starting server on {:?}", server.ip_addr);
                 match server.run().join() {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(pyo3::exceptions::ConnectionError::py_err(
+                    Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
                         "Could not start server. Address in use {:?}",
                     )),
                 }
             }
-            None => Err(pyo3::exceptions::AssertionError::py_err(
+            None => Err(pyo3::exceptions::PyAssertionError::new_err(
                 "Server not set. Did you initialize the object?",
             )),
         }
