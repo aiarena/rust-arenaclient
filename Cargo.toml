@@ -38,7 +38,7 @@ default-features = false
 features = ["sync"]
 
 [dependencies.pyo3]
-version = "0.11.0"
+version = "0.12.0"
 # features = ["extension-module"]
 
 [features]
