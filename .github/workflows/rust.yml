@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: konstin2/maturin:master
-      options: "-v ${PWD}:/io"
+      options: '--mount type=bind,source="$(pwd)",target=/io'
     steps:
     - uses: actions/checkout@v2
     - name: Cache cargo registry
