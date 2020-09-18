@@ -86,7 +86,7 @@ jobs:
           override: true
     - name: Build wheels
       run: |
-        maturin build
+        maturin build --interpreter python${{matrix.python_version}}
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
