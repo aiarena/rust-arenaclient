@@ -86,7 +86,7 @@ jobs:
           override: true
     - name: Build wheels
       run: |
-        maturin build --releae
+        maturin build --release
     - uses: actions/upload-artifact@v2
       name: upload-wheel
       with:
