@@ -43,7 +43,7 @@ jobs:
     container: 
       image: konstin2/maturin:master
       volumes: 
-        - $(pwd):/io
+        - $GITHUB_WORKSPACE:/io
     steps:
     - uses: actions/checkout@v2
     - name: Cache cargo registry
