@@ -20,3 +20,6 @@ settings.json
 *.pyc
 *.pyd
 test.py
+
+# Virtualenv files
+venv/
