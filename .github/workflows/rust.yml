@@ -11,14 +11,183 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-registry-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo index
+      uses: actions/cache@v2
+      with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-index-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo build
+      uses: actions/cache@v2
+      with:
+          path: target
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-target-${{ hashFiles('**/Cargo.lock') }}
     - name: Build lib
-      run: cargo build --lib --verbose
+      run: cargo build --lib --verbose      
     - name: Build bin
       run: cargo build --bin rust_ac_bin --no-default-features --verbose
     - name: Run tests
       run: cargo test --verbose --no-default-features
+  
+  maturin_build:
+    runs-on: ${{ matrix.os }}
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.5, 3.6, 3.7, 3.8]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        exclude:
+          # There is a known issue where Python C extensions
+          # can not be built on Python 3.5 on Windows.
+          # https://github.com/actions/virtual-environments/issues/34
+          # Therefore, ujson can't be compiled and the build would fail.
+          - os: windows-latest
+            python-version: 3.5
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+          python-version: ${{ matrix.python-version }}
+          
+    - name: Install Dependancies
+      run: |
+        python -m pip install --upgrade pip
+        pip install maturin
+        pip install -r rust_ac/requirements.txt
+    - name: Cache cargo registry
+      uses: actions/cache@v2
+      with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-registry-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo index
+      uses: actions/cache@v2
+      with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-index-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo build
+      uses: actions/cache@v2
+      with:
+          path: target
+          key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-target-${{ hashFiles('**/Cargo.lock') }}
+    - name: Install latest Rust
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+          override: true
+    - name: Build wheels
+      run: |
+        maturin build --release
+    - uses: actions/upload-artifact@v2
+      name: upload-wheel
+      with:
+        name: wheel-many-linux
+        path: target/wheels
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: rustup component add rustfmt
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: rustup component add clippy
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+          
+  python-publish:
+    needs: [build, maturin_build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.5, 3.6, 3.7, 3.8]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        exclude:
+          # There is a known issue where Python C extensions
+          # can not be built on Python 3.5 on Windows.
+          # https://github.com/actions/virtual-environments/issues/34
+          # Therefore, ujson can't be compiled and the build would fail.
+          - os: windows-latest
+            python-version: 3.5
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install latest Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Dependancies
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin
+          pip install -r rust_ac/requirements.txt
+      - name: Build Python package
+        run: maturin build --release --strip --interpreter python${{matrix.python_version}}
+
+      - name: List wheels
+        if: matrix.os == 'windows-latest'
+        run: dir target\wheels\
+
+      - name: List wheels
+        if:  matrix.os != 'windows-latest'
+        run: find ./target/wheels/
+
+      # Note: Windows doesn't support glob
+      # https://stackoverflow.com/a/52481267/270334
+      - name: Install wheels
+        if:  matrix.os == 'windows-latest'
+        run: pip install --find-links=target\wheels rust_ac
+
+      - name: Install wheels
+        if:  matrix.os != 'windows-latest'
+        run: pip install target/wheels/rust_ac*.whl
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: target/wheels/rust_ac*.whl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: PyPi publish
+        if: github.event_name == 'release' && github.event.action == 'created'
+        env:
+          MATURIN_PASSWORD: ${{ secrets.PYPI }}
+        run: maturin publish --username __token__
