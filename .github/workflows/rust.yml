@@ -32,7 +32,7 @@ jobs:
     container: 
       image: konstin2/maturin:master
       volumes: 
-        - ${{ GITHUB_WORKSPACE }}:/io
+        - ./:/io
     steps:
     - uses: actions/checkout@v2
     - name: maturin-build
