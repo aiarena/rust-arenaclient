@@ -367,8 +367,8 @@ impl Player {
                     self.process.kill();
                     return Some(self);
                 }
-            }else if surrender{
-                    self.save_replay(replay_path.clone());
+            } else if surrender {
+                self.save_replay(replay_path.clone());
             }
 
             if let Some(msg) = gamec.recv() {
@@ -392,14 +392,14 @@ impl Player {
         // Connection already closed
         // Populate result if bot has left the game, otherwise it will show as
         // a crash
-        if surrender{
+        if surrender {
             let mut results: Vec<PlayerResult> = vec![PlayerResult::Victory; 2];
             results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Defeat;
             gamec.send(ToGameContent::GameOver((
-                        results,
-                        self.game_loops,
-                        self.frame_time,
-                    )));
+                results,
+                self.game_loops,
+                self.frame_time,
+            )));
             self.process.kill();
             return Some(self);
         }

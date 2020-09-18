@@ -110,12 +110,13 @@ impl Config {
             None => None,
         }
     }
-    pub fn archon(&self)-> bool{ self.archon }
+    pub fn archon(&self) -> bool {
+        self.archon
+    }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
     fn string_config() -> &'static str {
         "{\"Map\": \"AutomatonLE\",\
@@ -132,10 +133,9 @@ mod tests{
         \"ValidateRace\":true,\
         \"Player1Race\":\"random\",\
         \"Player2Race\":\"t\"}"
-
     }
     #[test]
-    fn test_load_from_str(){
+    fn test_load_from_str() {
         let str_config = string_config();
         let config = Config::load_from_str(&*str_config);
         assert_eq!(config.map(), "AutomatonLE");
