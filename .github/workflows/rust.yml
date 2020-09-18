@@ -28,7 +28,7 @@ jobs:
     container: 
       image: konstin2/maturin:master
       volumes: 
-        - ./:/io
+        - $(pwd):/io
     steps:
     - uses: actions/checkout@v2
     - name: maturin-build
