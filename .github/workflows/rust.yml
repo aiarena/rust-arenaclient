@@ -45,7 +45,6 @@ jobs:
   
   maturin_build:
     runs-on: ${{ matrix.os }}
-    needs: [build]
     strategy:
       fail-fast: false
       matrix:
