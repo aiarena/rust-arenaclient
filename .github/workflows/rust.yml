@@ -80,7 +80,7 @@ jobs:
           path: target
           key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-target-${{ hashFiles('**/Cargo.lock') }}
     - name: Install latest Rust
-      uses: actions-rs/toolchain@v2
+      uses: actions-rs/toolchain@v1
       with:
           toolchain: stable
           override: true
