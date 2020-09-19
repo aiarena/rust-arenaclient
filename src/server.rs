@@ -2,6 +2,7 @@ use crate::controller::{create_supervisor_listener, Controller, SupervisorAction
 use crate::proxy;
 use bincode::{deserialize, serialize};
 use crossbeam::channel::{self, TryRecvError};
+use log::info;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use pyo3::ToPyObject;
@@ -38,7 +39,7 @@ impl RustServer {
                 Ok((c_type, client)) => match c_type {
                     ClientType::Bot => {
                         if !controller.has_supervisor() {
-                            println!("No supervisor - Client shutdown");
+                            info!("No supervisor - Client shutdown");
                             client.shutdown().expect("Could not close connection");
                         } else {
                             controller.add_client(client);
@@ -48,7 +49,6 @@ impl RustServer {
                     ClientType::Controller => {
                         let client_split = client.split().unwrap();
                         controller.add_supervisor(client_split.1, sup_recv.to_owned());
-                        // controller.get_config_from_supervisor();
                         create_supervisor_listener(client_split.0, sup_send.to_owned());
                         controller.send_message("{\"Status\": \"Connected\"}");
                     }
@@ -59,7 +59,7 @@ impl RustServer {
             if let Some(action) = controller.recv_msg() {
                 match action {
                     SupervisorAction::Quit => {
-                        println!("Quit request received");
+                        info!("Quit request received");
                         controller.close();
                         controller.send_message("Reset");
                         controller.drop_supervisor();
@@ -107,7 +107,7 @@ impl PServer {
     pub fn run(&self) -> Result<(), PyErr> {
         match &self.server {
             Some(server) => {
-                println!("Starting server on {:?}", server.ip_addr);
+                info!("Starting server on {:?}", server.ip_addr);
                 match server.run().join() {
                     Ok(_) => Ok(()),
                     Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(

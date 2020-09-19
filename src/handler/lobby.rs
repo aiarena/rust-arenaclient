@@ -1,6 +1,6 @@
 //! Game manages a single unstarted handler, including its configuration
 
-use log::error;
+use log::{error, info};
 use std::thread::JoinHandle;
 
 use protobuf::RepeatedField;
@@ -92,12 +92,8 @@ impl GameLobby {
         assert!(!self.players.is_empty());
 
         // Craft CrateGame request
-        let mut player_configs: Vec<CreateGamePlayer> = Vec::new();
-
-        // Participant players first
-        for _ in &self.players {
-            player_configs.push(CreateGamePlayer::Participant);
-        }
+        let player_configs: Vec<CreateGamePlayer> =
+            vec![CreateGamePlayer::Participant; self.players.len()];
 
         // TODO: Human players?
         // TODO: Observers?
@@ -115,7 +111,7 @@ impl GameLobby {
             );
             return None;
         } else {
-            println!("Game created successfully");
+            info!("Game created successfully");
         }
 
         Some(())
@@ -167,7 +163,7 @@ impl GameLobby {
                 error!("Could not join handler: {:?}", resp_join_game.get_error());
                 return None;
             } else {
-                println!("Game join successful");
+                info!("Game join successful");
             }
 
             // No error, pass through the response
@@ -204,6 +200,7 @@ impl GameLobby {
 }
 
 /// Used to pass player setup info to CreateGame
+#[derive(Clone, Copy)]
 enum CreateGamePlayer {
     Participant,
     Observer,

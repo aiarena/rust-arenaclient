@@ -15,6 +15,7 @@ pub mod server;
 
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
+    env_logger::init();
     m.add_class::<server::PServer>()?;
     Ok(())
 }

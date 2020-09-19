@@ -1,5 +1,5 @@
 //! Bot player participant
-use log::{debug, trace, warn};
+use log::{debug, error, info, trace, warn};
 use std::fmt;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::time::Instant;
@@ -20,7 +20,6 @@ use std::fs::File;
 use std::io::Write;
 use std::thread;
 use std::thread::JoinHandle;
-
 /// Player process, connection and details
 pub struct Player {
     /// SC2 process for this player
@@ -232,20 +231,20 @@ impl Player {
                         buffer
                             .write_all(data)
                             .expect("Could not write to replay file");
-                        println!("Replay saved to {:?}", &path);
+                        info!("Replay saved to {:?}", &path);
                         true
                     }
                     Err(e) => {
-                        println!("Failed to create replay file {:?}: {:?}", &path, e);
+                        error!("Failed to create replay file {:?}: {:?}", &path, e);
                         false
                     }
                 }
             } else {
-                println!("No replay data available");
+                error!("No replay data available");
                 false
             }
         } else {
-            println!("Could not save replay");
+            error!("Could not save replay");
             false
         }
     }
@@ -285,7 +284,7 @@ impl Player {
             let mut response_raw = match self.sc2_query_raw(req_raw) {
                 Some(d) => d,
                 None => {
-                    println!("SC2 unexpectedly closed the connection");
+                    error!("SC2 unexpectedly closed the connection");
                     gamec.send(ToGameContent::SC2UnexpectedConnectionClose);
                     debug!("Killing the process");
                     self.process.kill();
@@ -404,7 +403,7 @@ impl Player {
             return Some(self);
         }
         gamec.send(ToGameContent::UnexpectedConnectionClose);
-        println!("Killing process after unexpected connection close (Crash)");
+        info!("Killing process after unexpected connection close (Crash)");
         self.process.kill();
         Some(self)
     }
