@@ -140,6 +140,7 @@ mod tests {
     use super::*;
     use pyo3::py_run;
     use pyo3::types::PyDict;
+    use websocket::ClientBuilder;
 
     fn add_module(py: Python, module: &PyModule) -> PyResult<()> {
         py.import("sys")?
@@ -167,5 +168,16 @@ mod tests {
             inst2 = pickle.loads(pickle.dumps(inst))
         "#
         );
+    }
+    #[test]
+    fn test_server() {
+        let addr = format!("127.0.0.1:{}", portpicker::pick_unused_port().unwrap());
+        let ws_addr = format!("ws://{}", addr.clone());
+        let server = RustServer::new(addr.as_str());
+        let _t = server.run();
+        let c = ClientBuilder::new(ws_addr.as_str())
+            .unwrap()
+            .connect_insecure();
+        assert!(c.is_ok());
     }
 }
