@@ -92,12 +92,8 @@ impl GameLobby {
         assert!(!self.players.is_empty());
 
         // Craft CrateGame request
-        let mut player_configs: Vec<CreateGamePlayer> = Vec::new();
-
-        // Participant players first
-        for _ in &self.players {
-            player_configs.push(CreateGamePlayer::Participant);
-        }
+        let player_configs: Vec<CreateGamePlayer> =
+            vec![CreateGamePlayer::Participant; self.players.len()];
 
         // TODO: Human players?
         // TODO: Observers?
@@ -204,6 +200,7 @@ impl GameLobby {
 }
 
 /// Used to pass player setup info to CreateGame
+#[derive(Clone, Copy)]
 enum CreateGamePlayer {
     Participant,
     Observer,
