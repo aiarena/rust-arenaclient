@@ -2,7 +2,7 @@ use crate::controller::{create_supervisor_listener, Controller, SupervisorAction
 use crate::proxy;
 use bincode::{deserialize, serialize};
 use crossbeam::channel::{self, TryRecvError};
-use log::{debug, info, trace};
+use log::info;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use pyo3::ToPyObject;
@@ -27,7 +27,6 @@ impl RustServer {
     }
 
     pub fn run(&self) -> JoinHandle<()> {
-        info!("some");
         let (proxy_sender, proxy_receiver) = channel::unbounded();
         let (sup_send, sup_recv) = channel::unbounded();
         let addr = self.ip_addr.clone();
@@ -36,7 +35,6 @@ impl RustServer {
         });
         let mut controller = Controller::new();
         thread::spawn(move || loop {
-            info!("1");
             match proxy_receiver.try_recv() {
                 Ok((c_type, client)) => match c_type {
                     ClientType::Bot => {
@@ -51,7 +49,6 @@ impl RustServer {
                     ClientType::Controller => {
                         let client_split = client.split().unwrap();
                         controller.add_supervisor(client_split.1, sup_recv.to_owned());
-                        // controller.get_config_from_supervisor();
                         create_supervisor_listener(client_split.0, sup_send.to_owned());
                         controller.send_message("{\"Status\": \"Connected\"}");
                     }
@@ -93,7 +90,6 @@ impl PServer {
     #[new]
     #[args(args = "*")]
     fn new(args: &PyTuple) -> Self {
-        info!("Creating PServer");
         match args.len() {
             0 => Self { server: None },
             1 => {

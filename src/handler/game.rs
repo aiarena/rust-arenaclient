@@ -1,10 +1,10 @@
 //! Game manages a single handler, including configuration and result gathering
 
-use crossbeam::channel::{select, Receiver, Sender};
-use std::thread;
-
 use crate::config::Config;
 use crate::sc2::PlayerResult;
+use crossbeam::channel::{select, Receiver, Sender};
+use log::{debug, info};
+use std::thread;
 
 use super::any_panic_to_string;
 use super::messaging::{create_channels, FromSupervisor, ToGame, ToGameContent, ToSupervisor};

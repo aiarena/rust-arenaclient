@@ -1,6 +1,6 @@
 //! Game manages a single unstarted handler, including its configuration
 
-use log::error;
+use log::{error, info};
 use std::thread::JoinHandle;
 
 use protobuf::RepeatedField;

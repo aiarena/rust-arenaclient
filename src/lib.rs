@@ -1,4 +1,3 @@
-use log::info;
 use pyo3::prelude::*;
 
 mod build_info;

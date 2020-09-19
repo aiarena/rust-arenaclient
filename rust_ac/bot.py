@@ -122,7 +122,6 @@ class Bot:
 
         try:
             is_linux = platform.system() == "Linux"
-            print(" ".join(cmd_line))
             with open(bot_folder.joinpath("data").joinpath("stderr.log").as_posix(), "w+") as out:
                 process = Popen(
                     " ".join(cmd_line),

@@ -1,5 +1,5 @@
 //! Bot player participant
-use log::{debug, trace, warn};
+use log::{debug, error, info, trace, warn};
 use std::fmt;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::time::Instant;
@@ -20,7 +20,6 @@ use std::fs::File;
 use std::io::Write;
 use std::thread;
 use std::thread::JoinHandle;
-
 /// Player process, connection and details
 pub struct Player {
     /// SC2 process for this player
