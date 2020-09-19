@@ -121,7 +121,7 @@ jobs:
           
   python-publish:
     needs: [build, maturin_build]
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || github.event_name == 'release'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
