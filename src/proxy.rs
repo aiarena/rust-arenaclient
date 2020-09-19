@@ -4,6 +4,7 @@ use crossbeam::channel::Sender;
 use std::net::ToSocketAddrs;
 
 use crate::server::ClientType;
+use log::info;
 use websocket::client::sync::Client as GenericClient;
 use websocket::server::sync::Server as GenericServer;
 use websocket::server::NoTlsAcceptor;
@@ -37,7 +38,7 @@ pub fn run<A: ToSocketAddrs>(addr: A, channel_out: Sender<(ClientType, Client)>)
 
     loop {
         if let Some((c_type, conn)) = get_connection(&mut server) {
-            println!("Connection accepted: {:?}", conn.peer_addr().unwrap());
+            info!("Connection accepted: {:?}", conn.peer_addr().unwrap(),);
             channel_out.send((c_type, conn)).expect("Send failed");
         }
     }
