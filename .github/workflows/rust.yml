@@ -121,6 +121,7 @@ jobs:
           
   python-publish:
     needs: [build, maturin_build]
+    if: github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
