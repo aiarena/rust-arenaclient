@@ -2,6 +2,7 @@ use crate::controller::{create_supervisor_listener, Controller, SupervisorAction
 use crate::proxy;
 use bincode::{deserialize, serialize};
 use crossbeam::channel::{self, TryRecvError};
+use log::{debug, info, trace};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use pyo3::ToPyObject;
@@ -26,6 +27,7 @@ impl RustServer {
     }
 
     pub fn run(&self) -> JoinHandle<()> {
+        info!("some");
         let (proxy_sender, proxy_receiver) = channel::unbounded();
         let (sup_send, sup_recv) = channel::unbounded();
         let addr = self.ip_addr.clone();
@@ -34,11 +36,12 @@ impl RustServer {
         });
         let mut controller = Controller::new();
         thread::spawn(move || loop {
+            info!("1");
             match proxy_receiver.try_recv() {
                 Ok((c_type, client)) => match c_type {
                     ClientType::Bot => {
                         if !controller.has_supervisor() {
-                            println!("No supervisor - Client shutdown");
+                            info!("No supervisor - Client shutdown");
                             client.shutdown().expect("Could not close connection");
                         } else {
                             controller.add_client(client);
@@ -59,7 +62,7 @@ impl RustServer {
             if let Some(action) = controller.recv_msg() {
                 match action {
                     SupervisorAction::Quit => {
-                        println!("Quit request received");
+                        info!("Quit request received");
                         controller.close();
                         controller.send_message("Reset");
                         controller.drop_supervisor();
@@ -90,6 +93,7 @@ impl PServer {
     #[new]
     #[args(args = "*")]
     fn new(args: &PyTuple) -> Self {
+        info!("Creating PServer");
         match args.len() {
             0 => Self { server: None },
             1 => {
@@ -107,7 +111,7 @@ impl PServer {
     pub fn run(&self) -> Result<(), PyErr> {
         match &self.server {
             Some(server) => {
-                println!("Starting server on {:?}", server.ip_addr);
+                info!("Starting server on {:?}", server.ip_addr);
                 match server.run().join() {
                     Ok(_) => Ok(()),
                     Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(

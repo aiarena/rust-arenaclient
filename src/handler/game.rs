@@ -59,19 +59,19 @@ impl Game {
                 frame_times[player_index] = results.2;
             }
             ToGameContent::LeftGame => {
-                println!("Player left handler before it was over");
+                info!("Player left handler before it was over");
                 player_results[player_index] = Some(PlayerResult::Defeat);
             }
             ToGameContent::QuitBeforeLeave => {
-                println!("Client quit without leaving the handler");
+                info!("Client quit without leaving the handler");
                 player_results[player_index] = Some(PlayerResult::Defeat);
             }
             ToGameContent::SC2UnexpectedConnectionClose => {
-                println!("SC2 process closed connection unexpectedly");
+                info!("SC2 process closed connection unexpectedly");
                 player_results[player_index] = Some(PlayerResult::SC2Crash);
             }
             ToGameContent::UnexpectedConnectionClose => {
-                println!("Unexpected connection close");
+                info!("Unexpected connection close");
                 player_results[player_index] = Some(PlayerResult::Crash);
             }
         }
@@ -110,7 +110,7 @@ impl Game {
                 recv(from_sv) -> r => match r {
                     Ok(FromSupervisor::Quit) => {
                         // Game quit requested
-                        println!("Supervisor requested handler quit");
+                        debug!("Supervisor requested handler quit");
 
                         result_tx
                             .send(GameResult {
@@ -128,7 +128,7 @@ impl Game {
             }
         }
 
-        println!("Game ready, results collected");
+        info!("Game ready, results collected");
 
         // Wait until the games are ready
         let mut result_players: Vec<Player> = Vec::new();

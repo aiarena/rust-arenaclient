@@ -21,7 +21,7 @@ class MatchRunner:
         self._processes = set()
         register(self._cleanup)
 
-    async def _run_game(self, game: GameConfig, port: int, host: str = '0.0.0.0'):
+    async def _run_game(self, game: GameConfig, port: int, host: str = '127.0.0.1'):
         s = Server(f"{host}:{port}")
         s.run()
         self._add_to_cleanup(s)

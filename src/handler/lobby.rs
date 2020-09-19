@@ -115,7 +115,7 @@ impl GameLobby {
             );
             return None;
         } else {
-            println!("Game created successfully");
+            info!("Game created successfully");
         }
 
         Some(())
@@ -167,7 +167,7 @@ impl GameLobby {
                 error!("Could not join handler: {:?}", resp_join_game.get_error());
                 return None;
             } else {
-                println!("Game join successful");
+                info!("Game join successful");
             }
 
             // No error, pass through the response
