@@ -13,7 +13,7 @@ use std::thread;
 use self::player::Player;
 
 pub use self::game::{Game, GameResult};
-pub use self::lobby::GameLobby;
+pub use self::lobby::{GameLobby, PlayerNum};
 pub use self::messaging::{FromSupervisor, ToSupervisor};
 
 fn any_panic_to_string(panic_msg: Box<dyn Any>) -> String {

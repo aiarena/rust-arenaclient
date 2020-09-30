@@ -1,6 +1,6 @@
 //! Game manages a single unstarted handler, including its configuration
 
-use log::{error, info};
+use log::{debug, error, info};
 use std::thread::JoinHandle;
 
 use protobuf::RepeatedField;
@@ -52,6 +52,7 @@ impl GameLobby {
         join_req: RequestJoinGame,
         client_data: (String, Option<Race>),
         must_join: bool,
+        player: PlayerNum,
     ) {
         let mut pd = PlayerData::from_join_request(join_req, self.config.archon());
         if self.config.validate_race() && client_data.1.is_some() {
@@ -59,9 +60,17 @@ impl GameLobby {
         }
         pd.name = Some(client_data.0);
         if must_join {
-            self.players.push(Player::new_no_thread(connection, pd))
+            match player {
+                PlayerNum::One => self
+                    .players
+                    .insert(0, Player::new_no_thread(connection, pd)),
+                PlayerNum::Two => self.players.push(Player::new_no_thread(connection, pd)),
+            }
         } else {
-            self.player_handles.push(Player::new(connection, pd))
+            match player {
+                PlayerNum::One => self.player_handles.insert(0, Player::new(connection, pd)),
+                PlayerNum::Two => self.player_handles.push(Player::new(connection, pd)),
+            }
         }
     }
 
@@ -219,4 +228,10 @@ impl CreateGamePlayer {
         }
         ps
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum PlayerNum {
+    One,
+    Two,
 }

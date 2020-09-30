@@ -75,9 +75,9 @@ pub struct ToGame {
 pub enum ToGameContent {
     /// Game ended normally
     GameOver((Vec<PlayerResult>, u32, f32)),
-    /// SC2 reponded to `leave_game` request
+    /// SC2 responded to `leave_game` request
     LeftGame,
-    /// SC2 reponded to `quit` request without the client leaving the handler
+    /// SC2 responded to `quit` request without the client leaving the handler
     QuitBeforeLeave,
     /// SC2 unexpectedly closed connection, usually user clicking the window close button
     SC2UnexpectedConnectionClose,

@@ -13,7 +13,9 @@ use protobuf::parse_from_bytes;
 
 use crate::build_info::BuildInfo;
 use crate::config::Config;
-use crate::handler::{spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle};
+use crate::handler::{
+    spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle, PlayerNum,
+};
 use crate::proxy::Client;
 use crate::result::JsonResult;
 use crate::sc2::Race;
@@ -153,6 +155,7 @@ impl Controller {
         match self.config.clone() {
             Some(config) => {
                 if self.connected_clients == 0 {
+                    debug!("Adding {}", config.player1());
                     self.clients.push((
                         (config.player1(), config.player1_bot_race()),
                         client,
@@ -165,6 +168,7 @@ impl Controller {
                     );
                     self.connected_clients += 1;
                 } else {
+                    debug!("Adding {}", config.player2());
                     self.clients.push((
                         (config.player2(), config.player2_bot_race()),
                         client,
@@ -247,7 +251,7 @@ impl Controller {
     #[must_use]
     fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
         let ((client_name, client_race), client, old_req) = self.clients.remove(index);
-
+        debug!("{} client_join_game", client_name);
         if old_req != None {
             error!("Client attempted to join a handler twice (dropping connection)");
             return None;
@@ -258,16 +262,32 @@ impl Controller {
             .expect("Could not set non-blocking");
         // TODO: Verify that InterfaceOptions are allowed
         // TODO: Fix this so it works without lobbies
-
+        let player = match client_name.clone() {
+            n if n == self.config.as_ref().unwrap().player1() => PlayerNum::One,
+            n if n == self.config.as_ref().unwrap().player2() => PlayerNum::Two,
+            _ => panic!(),
+        };
         if self.lobby.is_some() {
             let mut lobby = self.lobby.take().unwrap();
-            lobby.join(client, req, (client_name, client_race), self.light_mode);
+            lobby.join(
+                client,
+                req,
+                (client_name, client_race),
+                self.light_mode,
+                player,
+            );
             lobby.join_player_handles();
             let game = lobby.start()?;
             self.game = Some(spawn_game(game));
         } else if self.create_lobby() {
             let lobby = self.lobby.as_mut().unwrap();
-            lobby.join(client, req, (client_name, client_race), self.light_mode);
+            lobby.join(
+                client,
+                req,
+                (client_name, client_race),
+                self.light_mode,
+                player,
+            );
         } else {
             error!("Could not create lobby");
         }
@@ -333,7 +353,7 @@ impl Controller {
                         self.drop_client(i)
                     }
                     PlaylistAction::Respond(resp) => {
-                        debug!("Respond");
+                        debug!("Respond to {:?}", self.clients[i].0);
                         self.clients[i]
                             .1
                             .send_message(&resp)
@@ -348,8 +368,9 @@ impl Controller {
                         self.drop_client(i);
                     }
                     PlaylistAction::JoinGame(req) => {
+                        debug!("JoinGame from {:?}", self.clients[i].0);
                         let join_response = self.client_join_game(i, req);
-                        debug!("JoinGame");
+
                         if join_response == None {
                             error!("Game creation / joining failed");
                         }
