@@ -169,15 +169,15 @@ mod tests {
         "#
         );
     }
-    #[test]
-    fn test_server() {
-        let addr = format!("127.0.0.1:{}", portpicker::pick_unused_port().unwrap());
-        let ws_addr = format!("ws://{}", addr.clone());
-        let server = RustServer::new(addr.as_str());
-        let _t = server.run();
-        let c = ClientBuilder::new(ws_addr.as_str())
-            .unwrap()
-            .connect_insecure();
-        assert!(c.is_ok());
-    }
+    // #[test]
+    // fn test_server() {
+    //     let addr = format!("127.0.0.1:{}", portpicker::pick_unused_port().unwrap());
+    //     let ws_addr = format!("ws://{}", addr.clone());
+    //     let server = RustServer::new(addr.as_str());
+    //     let _t = server.run();
+    //     let c = ClientBuilder::new(ws_addr.as_str())
+    //         .unwrap()
+    //         .connect_insecure();
+    //     assert!(c.is_ok());
+    // }
 }
