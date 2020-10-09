@@ -104,9 +104,9 @@ impl PServer {
             _ => unreachable!(),
         }
     }
-    pub fn run(&self) -> Result<(), PyErr> {
+    pub fn run(&self, py: Python) -> Result<(), PyErr> {
         match &self.server {
-            Some(server) => {
+            Some(server) => py.allow_threads(move || {
                 info!("Starting server on {:?}", server.ip_addr);
                 match server.run().join() {
                     Ok(_) => Ok(()),
@@ -114,7 +114,7 @@ impl PServer {
                         "Could not start server. Address in use {:?}",
                     )),
                 }
-            }
+            }),
             None => Err(pyo3::exceptions::PyAssertionError::new_err(
                 "Server not set. Did you initialize the object?",
             )),
