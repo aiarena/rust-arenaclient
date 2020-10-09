@@ -52,6 +52,24 @@ games = [GameConfig('AutomatonLE', 'loser_bot', 'basic_bot') for _ in range(20)]
 results = m.run_games_multiple(games=games, instances=3)  # Multiple games - Run 3 games at a time
 ```
 
+## Logging
+Logging is done via the handly [pyo3-log](https://github.com/vorner/pyo3-log) crate. To get the Rust logs in Python, initialize the logging library before importing rust-arenaclient, i.e. 
+```python
+import os, subprocess, asyncio, aiohttp
+import logging # Needs to be imported before importing rust_ac
+logging.getLogger().setLevel(logging.DEBUG) # Set debugging level
+logging.basicConfig(filename="log.txt", level=logging.DEBUG, filemode="w+") # Write logs to a file called "log.txt"
+logging.info("") # Needed to initialize logging
+from rust_ac import Server
+
+from rust_ac.match_runner import MatchRunner
+from rust_ac import GameConfig
+
+
+m = MatchRunner(bot_directory=r"D:\desktop backup\aiarenaclient\aiarena-client\aiarena-test-bots")
+...
+```
+
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
