@@ -251,6 +251,7 @@ impl Player {
     /// Run handler communication loop
     #[must_use]
     pub fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
+        let game_start = Instant::now();
         let mut debug_response = Response::new();
         debug_response.set_id(0);
         debug_response.set_status(Status::in_game);
@@ -369,7 +370,23 @@ impl Player {
             } else if surrender {
                 self.save_replay(replay_path.clone());
             }
-
+            if game_start.elapsed().as_secs() >= config.max_real_time {
+                self.frame_time = frame_time / self.game_loops as f32;
+                self.frame_time = if self.frame_time.is_nan() {
+                    0_f32
+                } else {
+                    self.frame_time
+                };
+                debug!("Killing the process by request from the handler");
+                let results: Vec<PlayerResult> = vec![PlayerResult::Timeout; 2];
+                gamec.send(ToGameContent::GameOver((
+                    results,
+                    self.game_loops,
+                    self.frame_time,
+                )));
+                self.process.kill();
+                return Some(self);
+            }
             if let Some(msg) = gamec.recv() {
                 return match msg {
                     ToPlayer::Quit => {
@@ -381,6 +398,12 @@ impl Player {
                             self.frame_time
                         };
                         debug!("Killing the process by request from the handler");
+                        let results: Vec<PlayerResult> = vec![PlayerResult::Timeout; 2];
+                        gamec.send(ToGameContent::GameOver((
+                            results,
+                            self.game_loops,
+                            self.frame_time,
+                        )));
                         self.process.kill();
                         Some(self)
                     }

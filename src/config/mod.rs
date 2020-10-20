@@ -15,6 +15,8 @@ pub struct Config {
     pub(crate) map: String,
     #[serde(default, alias = "MaxGameTime")]
     pub(crate) max_game_time: u32,
+    #[serde(default, alias = "MaxRealTime")]
+    pub(crate) max_real_time: u64,
     #[serde(default, alias = "MaxFrameTime")]
     pub(crate) max_frame_time: i32,
     #[serde(default, alias = "Strikes")]
@@ -82,6 +84,9 @@ impl Config {
     }
     pub fn max_game_time(&self) -> u32 {
         self.max_game_time
+    }
+    pub fn max_real_time(&self) -> u64 {
+        self.max_real_time
     }
     pub fn replay_path(&self) -> String {
         self.replay_path.clone()
