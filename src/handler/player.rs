@@ -218,7 +218,7 @@ impl Player {
     }
     /// Saves replay to path
     pub fn save_replay(&mut self, path: String) -> bool {
-        if path == "" {
+        if path.is_empty() {
             return false;
         }
         let mut r = Request::new();
