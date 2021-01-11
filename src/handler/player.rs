@@ -7,8 +7,8 @@ use std::time::Instant;
 use websocket::result::WebSocketError;
 use websocket::OwnedMessage;
 
+use protobuf::Clear;
 use protobuf::Message;
-use protobuf::{parse_from_bytes, Clear};
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 
 use super::messaging::{ChannelToGame, ToGameContent, ToPlayer};
@@ -153,7 +153,7 @@ impl Player {
     pub fn client_get_request(&mut self) -> Option<Request> {
         match self.client_recv()? {
             OwnedMessage::Binary(bytes) => {
-                let resp = parse_from_bytes::<Request>(&bytes).expect("Invalid protobuf message");
+                let resp = Message::parse_from_bytes(&bytes).expect("Invalid protobuf message");
                 Some(resp)
             }
             OwnedMessage::Close(_) => None,
@@ -192,7 +192,7 @@ impl Player {
     pub fn sc2_recv(&mut self) -> Option<Response> {
         match self.sc2_ws.recv_message().ok()? {
             OwnedMessage::Binary(bytes) => {
-                Some(parse_from_bytes::<Response>(&bytes).expect("Invalid data"))
+                Some(Message::parse_from_bytes(&bytes).expect("Invalid data"))
             }
             OwnedMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
