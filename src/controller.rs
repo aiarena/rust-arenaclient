@@ -9,8 +9,6 @@ use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, WouldBlock};
 use websocket::message::{Message as ws_Message, OwnedMessage};
 use websocket::result::WebSocketError;
 
-use protobuf::parse_from_bytes;
-
 use crate::build_info::BuildInfo;
 use crate::config::Config;
 use crate::handler::{
@@ -299,7 +297,7 @@ impl Controller {
     fn process_client_message(&mut self, msg: OwnedMessage) -> PlaylistAction {
         match msg {
             OwnedMessage::Binary(bytes) => {
-                let req = parse_from_bytes::<sc2_proto::sc2api::Request>(&bytes);
+                let req = sc2_proto::sc2api::Request::parse_from_bytes(&bytes);
                 debug!("Incoming playlist request: {:?}", req);
 
                 match req {

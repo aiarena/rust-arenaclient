@@ -83,7 +83,7 @@ fn execute_info_path() -> Option<PathBuf> {
         .to_str()
         .expect("SC2_PROXY_SKIP_EXECUTE_INFO was invalid unicode");
 
-    if env_skip_str == "" || env_skip_str == "0" {
+    if env_skip_str.is_empty() || env_skip_str == "0" {
         None
     } else if cfg!(windows) {
         Some(
