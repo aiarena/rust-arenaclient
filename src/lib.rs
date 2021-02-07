@@ -1,17 +1,17 @@
 use pyo3::prelude::*;
 
 mod build_info;
-pub mod config;
-pub mod controller;
-pub mod handler;
-pub mod maps;
+mod config;
+mod controller;
+mod handler;
+mod maps;
 mod paths;
 mod portconfig;
-pub mod proxy;
+mod proxy;
 mod result;
-pub mod sc2;
+mod sc2;
 mod sc2process;
-pub mod server;
+mod server;
 
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -75,7 +75,7 @@ mod tests {
     //         player2: "loser_bot".to_string(),
     //         replay_path: "".to_string(),
     //         match_id: 1,
-    //         replay_name: "".to_string(),
+    //         replay_name.SC2Replay: "".to_string(),
     //         game_time: 0.0,
     //         game_time_seconds: 0.0,
     //         game_time_formatted: "".to_string(),

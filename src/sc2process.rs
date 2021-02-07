@@ -63,7 +63,7 @@ impl Process {
         let url = format!("ws://127.0.0.1:{}/sc2api", self.ws_port);
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), self.ws_port);
 
-        debug!("Connecting to the process");
+        debug!("Connecting to the SC2 process");
 
         for _ in 0..60 {
             sleep(Duration::new(1, 0));

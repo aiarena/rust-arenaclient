@@ -38,3 +38,5 @@ impl JsonResult {
         serde_json::to_string(&self).expect("Could not serialize Result")
     }
 }
+
+pub type SC2Result<T> = std::result::Result<T, String>;

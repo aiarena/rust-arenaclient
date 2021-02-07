@@ -21,10 +21,11 @@ class MatchRunner:
         self._processes = set()
         register(self._cleanup)
 
-    async def _run_game(self, game: GameConfig, port: int, host: str = '127.0.0.1'):
-        s = Server(f"{host}:{port}")
-        s.run()
-        self._add_to_cleanup(s)
+    async def _run_game(self, game: GameConfig, port: int, host: str = '127.0.0.1', connect_existing: bool = False):
+        if not connect_existing:
+            s = Server(f"{host}:{port}")
+            s.run()
+            self._add_to_cleanup(s)
         sup = Supervisor(f"127.0.0.1:{port}", config=game)
         bots = [Bot(game.player1, self.bot_directory), Bot(game.player2, self.bot_directory)]
         await sup.start_game()  # Sends config to proxy
@@ -57,9 +58,10 @@ class MatchRunner:
                 portpicker.return_port(port)
         return results
 
-    def run_game(self, game: GameConfig) -> Result:
-        port = portpicker.pick_unused_port()
-        return get_event_loop().run_until_complete(self._run_game(game, port))
+    def run_game(self, game: GameConfig, connect_existing: bool = False, port: int = 0) -> Result:
+        if not connect_existing:
+            port = portpicker.pick_unused_port()
+        return get_event_loop().run_until_complete(self._run_game(game, port, connect_existing=connect_existing))
 
     def _add_to_cleanup(self, process: Union[Server, Bot]):
         self._processes.add(process)

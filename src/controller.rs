@@ -15,8 +15,9 @@ use crate::handler::{
     spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle, PlayerNum,
 };
 use crate::proxy::Client;
-use crate::result::JsonResult;
+use crate::result::{JsonResult, SC2Result};
 use crate::sc2::Race;
+
 use crossbeam::channel::{Receiver, Sender};
 use protobuf::Message;
 use sc2_proto::{self, sc2api::RequestJoinGame};
@@ -114,7 +115,7 @@ impl Controller {
     }
 
     /// Sends a message to the supervisor
-    pub fn send_message(&mut self, message: &str) {
+    pub fn send_message_supervisor(&mut self, message: &str) {
         match &mut self.supervisor {
             Some(sender) => {
                 sender
@@ -149,7 +150,9 @@ impl Controller {
             .stream_ref()
             .set_read_timeout(Some(Duration::new(40, 0)))
             .expect("Could not set read timeout");
+
         debug_assert!(self.clients.len() < 2);
+
         match self.config.clone() {
             Some(config) => {
                 if self.connected_clients == 0 {
@@ -190,13 +193,14 @@ impl Controller {
     pub fn add_supervisor(&mut self, client: Writer<TcpStream>, recv: Receiver<SupervisorAction>) {
         if self.supervisor.is_some() {
             error!("Supervisor already set - Resetting supervisor");
+            self.drop_supervisor();
         }
         debug!("Added supervisor");
         self.supervisor = Some(client);
         self.super_recv = Some(recv);
     }
 
-    pub fn recv_msg(&self) -> Option<SupervisorAction> {
+    pub fn recv_msg_supervisor(&self) -> Option<SupervisorAction> {
         match &self.super_recv {
             Some(recv) => {
                 while let Ok(data) = recv.try_recv() {
@@ -246,13 +250,14 @@ impl Controller {
 
     /// Join to handler from playlist
     /// If handler join fails, drops connection
-    #[must_use]
-    fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
+    fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> SC2Result<()> {
         let ((client_name, client_race), client, old_req) = self.clients.remove(index);
         debug!("{} client_join_game", client_name);
         if old_req != None {
-            error!("Client attempted to join a handler twice (dropping connection)");
-            return None;
+            let err_msg =
+                "Client attempted to join a handler twice (dropping connection)".to_string();
+            error!("{}", err_msg);
+            return Err(err_msg);
         }
 
         client
@@ -290,7 +295,7 @@ impl Controller {
             error!("Could not create lobby");
         }
 
-        Some(())
+        Ok(())
     }
 
     /// Process message from a client in the playlist
@@ -361,16 +366,17 @@ impl Controller {
                         self.clients[i]
                             .1
                             .send_message(&resp)
-                            .expect("Could not respond");
+                            .expect("Could not send QuitRequest");
                         debug!("RespondQuit");
                         self.drop_client(i);
                     }
                     PlaylistAction::JoinGame(req) => {
                         debug!("JoinGame from {:?}", self.clients[i].0);
-                        let join_response = self.client_join_game(i, req);
-
-                        if join_response == None {
-                            error!("Game creation / joining failed");
+                        if let Err(e) = self.client_join_game(i, req) {
+                            error!(
+                                "Game creation / joining for {:?} failed: {}",
+                                self.clients[i].0, e
+                            );
                         }
                     }
                 },
@@ -398,7 +404,7 @@ impl Controller {
                     let average_frame_time: Option<HashMap<String, f32>>;
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
                     for p in players.into_iter() {
-                        avg_hash.insert(p.player_name().unwrap(), p.frame_time);
+                        avg_hash.insert(p.player_name().unwrap().clone(), p.frame_time);
                     }
                     average_frame_time = Some(avg_hash);
                     let player_results = result.player_results;
@@ -420,7 +426,7 @@ impl Controller {
                         average_frame_time,
                         Some("Complete".to_string()),
                     );
-                    self.send_message(j_result.serialize().as_ref());
+                    self.send_message_supervisor(j_result.serialize().as_ref());
 
                     for i in (0..self.clients.len()).rev() {
                         self.drop_client(i)
@@ -434,63 +440,6 @@ impl Controller {
                 }
             }
         }
-        // let mut games_over = Vec::new();
-        // for (id, game) in self.game.iter_mut() {
-        //     if game.check() {
-        //         println!("Game over");
-        //         games_over.push(*id);
-        //     }
-        // }
-        //
-        // for id in games_over {
-        //     let game = self.game.remove(&id).unwrap();
-        //     // let average_frame_time: Option<HashMap<String, f32>>;
-        //     // let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-        //     // for p in handler.players.iter(){
-        //     //     avg_hash.insert(p.player_name().unwrap(), p.frame_time);
-        //     // }
-        //     // average_frame_time = Some(avg_hash);
-        //     match game.collect_result() {
-        //         Ok((result, players)) => {
-        //             let average_frame_time: Option<HashMap<String, f32>>;
-        //             let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-        //             for p in players.into_iter() {
-        //                 avg_hash.insert(p.player_name().unwrap(), p.frame_time);
-        //             }
-        //             average_frame_time = Some(avg_hash);
-        //             let player_results = result.player_results;
-        //
-        //             let p1 = self.config.clone().unwrap().clone().player1();
-        //             let p2 = self.config.clone().unwrap().clone().player2();
-        //             let mut game_result = HashMap::with_capacity(2);
-        //             game_result.insert(p1.clone(), player_results[0].to_string());
-        //             game_result.insert(p2.clone(), player_results[1].to_string());
-        //             let game_time = Some(result.game_loops);
-        //             let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
-        //             println!("{:?}", game_result);
-        //
-        //             let j_result = JsonResult::from(
-        //                 Some(game_result),
-        //                 game_time,
-        //                 game_time_seconds,
-        //                 None,
-        //                 average_frame_time,
-        //                 Some("Complete".to_string()),
-        //             );
-        //             self.send_message(j_result.serialize().as_ref());
-        //             self.receive_confirmation();
-        //             for i in (0..self.clients.len()).rev() {
-        //                 self.drop_client(i)
-        //             }
-        //             self.drop_supervisor();
-        //             self.reset();
-        //             // println!("Game result: {:?}", result);
-        //         }
-        //         Err(msg) => {
-        //             error!("Game thread panicked with: {:?}", msg);
-        //         }
-        //     }
-        // }
     }
 
     /// Destroys the controller, ending all games,

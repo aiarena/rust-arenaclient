@@ -2,6 +2,7 @@
 
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
 
+use crate::result::SC2Result;
 use crate::sc2::PlayerResult;
 
 /// Request from the supervisor
@@ -92,10 +93,8 @@ pub struct ChannelToPlayer {
 }
 impl ChannelToPlayer {
     /// Sends a message to the player
-    pub fn send(&mut self, content: ToPlayer) {
-        self.tx
-            .send(content)
-            .expect("Unable to send to the handler");
+    pub fn send(&mut self, content: ToPlayer) -> SC2Result<()> {
+        self.tx.send(content).map_err(|e| e.to_string())
     }
 }
 

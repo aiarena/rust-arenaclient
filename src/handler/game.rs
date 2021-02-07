@@ -3,12 +3,13 @@
 use crate::config::Config;
 use crate::sc2::PlayerResult;
 use crossbeam::channel::{select, Receiver, Sender};
-use log::{debug, info};
+use log::{debug, error, info};
 use std::thread;
 
 use super::any_panic_to_string;
 use super::messaging::{create_channels, FromSupervisor, ToGame, ToGameContent, ToSupervisor};
 use super::player::Player;
+use crate::handler::messaging::ToPlayer;
 
 /// Game result data
 #[derive(Debug, Clone)]
@@ -43,6 +44,7 @@ impl Game {
         player_results: &mut Vec<Option<PlayerResult>>,
         game_loops: &mut u32,
         frame_times: &mut [f32; 2],
+        game_over: &mut bool,
     ) {
         let ToGame {
             player_index,
@@ -57,22 +59,31 @@ impl Game {
                 }
                 *game_loops = results.1;
                 frame_times[player_index] = results.2;
+                *game_over = true;
             }
             ToGameContent::LeftGame => {
                 info!("Player left handler before it was over");
                 player_results[player_index] = Some(PlayerResult::Defeat);
+                *game_over = true;
             }
             ToGameContent::QuitBeforeLeave => {
                 info!("Client quit without leaving the handler");
                 player_results[player_index] = Some(PlayerResult::Defeat);
+                *game_over = true;
             }
             ToGameContent::SC2UnexpectedConnectionClose => {
                 info!("SC2 process closed connection unexpectedly");
                 player_results[player_index] = Some(PlayerResult::SC2Crash);
+                *game_over = true;
             }
             ToGameContent::UnexpectedConnectionClose => {
                 info!("Unexpected connection close");
                 player_results[player_index] = Some(PlayerResult::Crash);
+                *game_over = true;
+                match player_index {
+                    0 => player_results[1] = Some(PlayerResult::Victory),
+                    _ => player_results[0] = Some(PlayerResult::Victory),
+                }
             }
         }
     }
@@ -88,9 +99,9 @@ impl Game {
         let mut handles: Vec<thread::JoinHandle<Option<Player>>> = Vec::new();
         let mut game_loops = 0_u32;
         let mut frame_times: [f32; 2] = [0_f32, 0_f32];
-        let (rx, mut _to_player_channels, player_channels) = create_channels(self.players.len());
+        let (rx, to_player_channels, player_channels) = create_channels(self.players.len());
         let mut player_results: Vec<Option<PlayerResult>> = vec![None; self.players.len()];
-
+        let mut game_over = false;
         // Run games
         for (p, c) in self.players.into_iter().zip(player_channels) {
             let thread_config: Config = self.config.clone();
@@ -98,12 +109,12 @@ impl Game {
             handles.push(handle);
         }
 
-        while player_results.contains(&None) {
+        while !game_over {
             select! {
                 // A client ended the handler
                 recv(rx) -> r => match r {
                     Ok(msg) => {
-                        Self::process_msg(msg, &mut player_results, &mut game_loops, &mut frame_times);
+                        Self::process_msg(msg, &mut player_results, &mut game_loops, &mut frame_times, &mut game_over);
                     },
                     Err(e) => panic!("Player channel closed without sending results {:?}",e),
                 },
@@ -129,6 +140,11 @@ impl Game {
         }
 
         info!("Game ready, results collected");
+        for mut c in to_player_channels {
+            if let Err(e) = c.send(ToPlayer::Quit) {
+                error!("{:?}", e)
+            }
+        }
 
         // Wait until the games are ready
         let mut result_players: Vec<Player> = Vec::new();

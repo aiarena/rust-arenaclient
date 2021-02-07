@@ -13,6 +13,7 @@ use crate::proxy::Client;
 use super::game::Game;
 use super::player::{Player, PlayerData};
 use crate::config::Config;
+use crate::result::SC2Result;
 use crate::sc2::Race;
 
 /// An unstarted handler
@@ -39,10 +40,6 @@ impl GameLobby {
             // self.players.push(handle.join().unwrap());
             self.players.insert(0, handle.join().unwrap());
         }
-    }
-    /// Checks if this lobby has any player participants
-    pub fn is_valid(&self) -> bool {
-        !self.players.is_empty()
     }
 
     /// Add a new client to the handler
@@ -96,8 +93,7 @@ impl GameLobby {
 
     /// Create the handler using the first client
     /// Returns None if handler join fails (connection close or sc2 process close)
-    #[must_use]
-    pub fn create_game(&mut self) -> Option<()> {
+    pub fn create_game(&mut self) -> SC2Result<()> {
         assert!(!self.players.is_empty());
 
         // Craft CrateGame request
@@ -109,7 +105,7 @@ impl GameLobby {
 
         // Send CreateGame request to first process
         let proto = self.proto_create_game(player_configs);
-        let response = self.players[0].sc2_query(proto)?;
+        let response = self.players[0].sc2_query(proto, "Supervisor")?;
 
         assert!(response.has_create_game());
         let resp_create_game = response.get_create_game();
@@ -118,12 +114,15 @@ impl GameLobby {
                 "Could not create handler: {:?}",
                 resp_create_game.get_error()
             );
-            return None;
+            return Err(format!(
+                "Could not create handler. {:?}",
+                resp_create_game.get_error()
+            ));
         } else {
             info!("Game created successfully");
         }
 
-        Some(())
+        Ok(())
     }
 
     /// Protobuf to join a handler
@@ -148,9 +147,8 @@ impl GameLobby {
     }
 
     /// Joins all participants to games
-    /// Returns None iff handler join fails (connection close or sc2 process close)
-    #[must_use]
-    pub fn join_all_game(&mut self) -> Option<()> {
+    /// Returns Err if handler join fails (connection close or sc2 process close)
+    pub fn join_all_game(&mut self) -> SC2Result<()> {
         let pc = PortConfig::new().expect("Unable to find free ports");
 
         let protos: Vec<_> = self
@@ -164,15 +162,18 @@ impl GameLobby {
         }
 
         for player in self.players.iter_mut() {
-            let response = player.sc2_recv()?;
+            let player_name = player.data.name.as_ref().unwrap().clone();
+            let response = player.sc2_recv(&player_name)?;
             assert!(response.has_join_game());
             let resp_join_game = response.get_join_game();
             player.player_id = Some(resp_join_game.get_player_id());
             if resp_join_game.has_error() {
-                error!("Could not join handler: {:?}", resp_join_game.get_error());
-                return None;
+                let err_message =
+                    format!("Could not join handler: {:?}", resp_join_game.get_error());
+                player.error(format!("{}", err_message));
+                return Err(err_message);
             } else {
-                info!("Game join successful");
+                player.info("Game join successful".to_string());
             }
 
             // No error, pass through the response
@@ -182,17 +183,16 @@ impl GameLobby {
         // TODO: Human players?
         // TODO: Observers?
 
-        Some(())
+        Ok(())
     }
 
     /// Start the handler, and send responses to join requests
     /// Returns None if handler create or join fails (connection close or sc2 process close)
     /// In that case, the connections are dropped (closed).
-    #[must_use]
-    pub fn start(mut self) -> Option<Game> {
+    pub fn start(mut self) -> SC2Result<Game> {
         self.create_game()?;
         self.join_all_game()?;
-        Some(Game {
+        Ok(Game {
             config: self.config,
             players: self.players,
         })

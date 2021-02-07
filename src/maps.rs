@@ -3,9 +3,10 @@
 use std::fs;
 
 use crate::paths::map_dir;
+use crate::result::SC2Result;
 
 /// Find a map file, returning its relative path to the sc2 map directory
-pub fn find_map(mut name: String) -> Option<String> {
+pub fn find_map(mut name: String) -> SC2Result<String> {
     name = name.replace(" ", "");
     if !name.ends_with(".SC2Map") {
         name.push_str(".SC2Map");
@@ -23,7 +24,7 @@ pub fn find_map(mut name: String) -> Option<String> {
             if current.to_ascii_lowercase() == name.to_ascii_lowercase() {
                 let relative = outer_path.strip_prefix(mapdir).unwrap();
                 let relative_str = relative.to_str().unwrap();
-                return Some(relative_str.to_owned());
+                return Ok(relative_str.to_owned());
             } else {
                 continue;
             }
@@ -39,9 +40,9 @@ pub fn find_map(mut name: String) -> Option<String> {
             if current.to_ascii_lowercase() == name.to_ascii_lowercase() {
                 let relative = path.strip_prefix(mapdir).unwrap();
                 let relative_str = relative.to_str().unwrap();
-                return Some(relative_str.to_owned());
+                return Ok(relative_str.to_owned());
             }
         }
     }
-    None
+    Err("Map Not Found".to_string())
 }

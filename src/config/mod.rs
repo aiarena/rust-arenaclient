@@ -8,59 +8,53 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Config {
     #[serde(default)]
-    pub(crate) pids: Vec<u32>,
+    pids: Vec<u32>,
     #[serde(default)]
-    pub(crate) average_frame_time: Vec<HashMap<String, f32>>,
+    average_frame_time: Vec<HashMap<String, f32>>,
     #[serde(default, alias = "Map")]
-    pub(crate) map: String,
+    map: String,
     #[serde(default, alias = "MaxGameTime")]
-    pub(crate) max_game_time: u32,
+    max_game_time: u32,
     #[serde(default, alias = "MaxFrameTime")]
-    pub(crate) max_frame_time: i32,
+    max_frame_time: i32,
     #[serde(default, alias = "Strikes")]
-    pub(crate) strikes: i32,
+    strikes: i32,
     #[serde(default)]
-    pub(crate) result: Vec<HashMap<String, String>>,
+    result: Vec<HashMap<String, String>>,
     #[serde(default, alias = "Player1")]
-    pub(crate) player1: String,
+    player1: String,
     #[serde(default, alias = "Player2")]
-    pub(crate) player2: String,
+    player2: String,
     #[serde(default, alias = "ReplayPath")]
-    pub(crate) replay_path: String,
+    replay_path: String,
     #[serde(default, alias = "MatchID")]
-    pub(crate) match_id: i64,
+    match_id: i64,
     #[serde(default, alias = "ReplayName")]
-    pub(crate) replay_name: String,
+    replay_name: String,
     #[serde(default)]
-    pub(crate) game_time: f32,
+    game_time: f32,
     #[serde(default)]
-    pub(crate) game_time_seconds: f32,
+    game_time_seconds: f32,
     #[serde(default)]
-    pub(crate) game_time_formatted: String,
+    game_time_formatted: String,
     #[serde(default, alias = "DisableDebug")]
-    pub(crate) disable_debug: bool,
+    disable_debug: bool,
     #[serde(default, alias = "RealTime")]
-    pub(crate) real_time: bool,
+    real_time: bool,
     #[serde(default, alias = "Visualize")]
-    pub(crate) visualize: bool,
+    visualize: bool,
     #[serde(default, alias = "LightMode")]
-    pub(crate) light_mode: bool,
+    light_mode: bool,
     #[serde(default, alias = "ValidateRace")]
-    pub(crate) validate_race: bool,
+    validate_race: bool,
     #[serde(default, alias = "Player1Race")]
-    pub(crate) player1_race: Option<String>,
+    player1_race: Option<String>,
     #[serde(default, alias = "Player2Race")]
-    pub(crate) player2_race: Option<String>,
+    player2_race: Option<String>,
     #[serde(default, alias = "Archon")]
-    pub(crate) archon: bool,
+    archon: bool,
 }
 impl Config {
-    /// New default config
-    pub fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
-    }
     pub fn load_from_str(data: &str) -> Self {
         let p: Self = serde_json::from_str(data).expect("Could not load config from JSON");
         p
@@ -96,7 +90,7 @@ impl Config {
         self.player1_race.clone()
     }
     pub fn player1_bot_race(&self) -> Option<Race> {
-        match self.player1_race.clone() {
+        match self.player1_race() {
             Some(string) => Some(BotRace::from_str(&*string).to_race()),
             None => None,
         }
@@ -105,7 +99,7 @@ impl Config {
         self.player2_race.clone()
     }
     pub fn player2_bot_race(&self) -> Option<Race> {
-        match self.player2_race.clone() {
+        match self.player2_race() {
             Some(string) => Some(BotRace::from_str(&*string).to_race()),
             None => None,
         }

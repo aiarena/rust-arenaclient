@@ -13,7 +13,7 @@ pub enum ClientType {
     Bot,
     Controller,
 }
-
+/// Starts the websocket server on ip_addr
 #[derive(Serialize, Deserialize)]
 pub struct RustServer {
     ip_addr: String,
@@ -43,30 +43,44 @@ impl RustServer {
                             client.shutdown().expect("Could not close connection");
                         } else {
                             controller.add_client(client);
-                            controller.send_message("{\"Bot\": \"Connected\"}")
+                            controller.send_message_supervisor(
+                                r#"
+                            {
+                                "Bot": "Connected"
+                            }"#,
+                            )
                         }
                     }
                     ClientType::Controller => {
                         let client_split = client.split().unwrap();
                         controller.add_supervisor(client_split.1, sup_recv.to_owned());
                         create_supervisor_listener(client_split.0, sup_send.to_owned());
-                        controller.send_message("{\"Status\": \"Connected\"}");
+                        controller.send_message_supervisor(
+                            r#"{
+                            "Status": "Connected"
+                        }"#,
+                        );
                     }
                 },
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => break,
             }
-            if let Some(action) = controller.recv_msg() {
+            if let Some(action) = controller.recv_msg_supervisor() {
                 match action {
                     SupervisorAction::Quit => {
-                        info!("Quit request received");
+                        info!("Supervisor quit request received");
                         controller.close();
-                        controller.send_message("Reset");
+                        controller.send_message_supervisor("Reset");
                         controller.drop_supervisor();
                     }
                     SupervisorAction::Config(config) => {
                         controller.set_config(config);
-                        controller.send_message("{\"Config\": \"Received\"}");
+                        controller.send_message_supervisor(
+                            r#"
+                        {
+                            "Config": "Received"
+                        }"#,
+                        );
                     }
                     SupervisorAction::ForceQuit => break,
                     _ => {}
@@ -79,6 +93,9 @@ impl RustServer {
         })
     }
 }
+
+/// Python Wrapper for RustServer
+/// Needed so that we can pickle the server (needed for multi-threading)
 #[pyclass(module = "rust_ac")]
 #[text_signature = "(ip_addr)"]
 pub(crate) struct PServer {
@@ -169,15 +186,4 @@ mod tests {
         "#
         );
     }
-    // #[test]
-    // fn test_server() {
-    //     let addr = format!("127.0.0.1:{}", portpicker::pick_unused_port().unwrap());
-    //     let ws_addr = format!("ws://{}", addr.clone());
-    //     let server = RustServer::new(addr.as_str());
-    //     let _t = server.run();
-    //     let c = ClientBuilder::new(ws_addr.as_str())
-    //         .unwrap()
-    //         .connect_insecure();
-    //     assert!(c.is_ok());
-    // }
 }

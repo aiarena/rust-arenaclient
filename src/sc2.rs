@@ -54,23 +54,6 @@ pub enum Difficulty {
     CheatMoney,
     CheatInsane,
 }
-impl Difficulty {
-    pub fn to_proto(self) -> sc2_proto::sc2api::Difficulty {
-        use sc2_proto::sc2api::Difficulty;
-        match self {
-            Self::VeryEasy => Difficulty::VeryEasy,
-            Self::Easy => Difficulty::Easy,
-            Self::Medium => Difficulty::Medium,
-            Self::MediumHard => Difficulty::MediumHard,
-            Self::Hard => Difficulty::Hard,
-            Self::Harder => Difficulty::Harder,
-            Self::VeryHard => Difficulty::VeryHard,
-            Self::CheatVision => Difficulty::CheatVision,
-            Self::CheatMoney => Difficulty::CheatMoney,
-            Self::CheatInsane => Difficulty::CheatInsane,
-        }
-    }
-}
 impl Default for Difficulty {
     fn default() -> Self {
         Difficulty::Hard
@@ -101,18 +84,6 @@ impl PlayerResult {
             Result::Defeat => Self::Defeat,
             Result::Tie => Self::Tie,
             Result::Undecided => panic!("Undecided result not allowed"),
-        }
-    }
-
-    pub fn to_proto(self) -> sc2_proto::sc2api::Result {
-        use sc2_proto::sc2api::Result;
-        match self {
-            Self::Victory => Result::Victory,
-            Self::Defeat => Result::Defeat,
-            Self::Tie => Result::Tie,
-            Self::Crash => Result::Defeat,
-            Self::Timeout => Result::Defeat,
-            Self::SC2Crash => Result::Undecided,
         }
     }
 }
