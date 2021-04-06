@@ -33,6 +33,7 @@ pub enum SupervisorAction {
     NoAction,
     Received,
     Config(String),
+    Ping
 }
 
 enum PlaylistAction {
@@ -112,7 +113,18 @@ impl Controller {
         self.game = None;
         self.connected_clients = 0;
     }
-
+    pub fn send_pong(&mut self){
+        match &mut self.supervisor {
+            Some(sender) => {
+                sender
+                    .send_message(&ws_Message::pong(vec![0_u8]))
+                    .expect("Could not send message to supervisor");
+            }
+            None => {
+                error!("send_message: Supervisor not set");
+            }
+        }
+    }
     /// Sends a message to the supervisor
     pub fn send_message(&mut self, message: &str) {
         match &mut self.supervisor {
@@ -533,9 +545,11 @@ pub fn create_supervisor_listener(
 ) {
     thread::spawn(move || loop {
         let r_msg = client_recv.recv_message();
+        trace!("message received from supervisor client");
         match r_msg {
             Ok(msg) => {
-                if let OwnedMessage::Text(data) = msg {
+                match msg{
+                    OwnedMessage::Text(data) =>{
                     if data == "Reset" {
                         sender
                             .send(SupervisorAction::Quit)
@@ -554,8 +568,14 @@ pub fn create_supervisor_listener(
                             .send(SupervisorAction::ForceQuit)
                             .expect("Could not send ForceQuit");
                     }
-                }
+                },
+                
+               OwnedMessage::Ping(_) =>{
+                    sender.send(SupervisorAction::Ping).expect("Could not send SupervisorAction");
+                },
+                _ => {}
             }
+        }
             Err(WebSocketError::NoDataAvailable) => {
                 break;
             }

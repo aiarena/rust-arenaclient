@@ -1,16 +1,16 @@
 use pyo3::prelude::*;
 
-mod build_info;
+pub mod build_info;
 pub mod config;
 pub mod controller;
 pub mod handler;
 pub mod maps;
-mod paths;
-mod portconfig;
+pub mod paths;
+pub mod portconfig;
 pub mod proxy;
-mod result;
+pub mod result;
 pub mod sc2;
-mod sc2process;
+pub mod sc2process;
 pub mod server;
 
 #[pymodule]

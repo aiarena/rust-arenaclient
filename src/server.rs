@@ -69,6 +69,9 @@ impl RustServer {
                         controller.send_message("{\"Config\": \"Received\"}");
                     }
                     SupervisorAction::ForceQuit => break,
+                    SupervisorAction::Ping =>{
+                        controller.send_pong();
+                    }
                     _ => {}
                 }
             }
