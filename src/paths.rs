@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
-fn default_base() -> PathBuf {
+pub fn default_base() -> PathBuf {
     // TODO: Detect Wine and use "~/.wine/drive_c/Program Files (x86)/StarCraft II"
 
     if let Some(base_dir) = var_os("SC2_PROXY_BASE") {
@@ -24,7 +24,7 @@ fn default_base() -> PathBuf {
 }
 
 /// SC2 binary path inside the correct version folder
-fn bin_path() -> PathBuf {
+pub fn bin_path() -> PathBuf {
     if let Some(base_dir) = var_os("SC2_PROXY_BIN") {
         Path::new(&base_dir).to_path_buf()
     } else if cfg!(windows) {
@@ -39,7 +39,7 @@ fn bin_path() -> PathBuf {
 }
 
 /// The working directory to use inside the base dir
-fn cwd() -> Option<PathBuf> {
+pub fn cwd() -> Option<PathBuf> {
     if let Some(base_dir) = var_os("SC2_PROXY_CWD") {
         Some(Path::new(&base_dir).to_path_buf())
     } else if cfg!(windows) {
@@ -49,7 +49,7 @@ fn cwd() -> Option<PathBuf> {
     }
 }
 
-fn latest_executable_path(versions_dir: PathBuf) -> PathBuf {
+pub fn latest_executable_path(versions_dir: PathBuf) -> PathBuf {
     let (max_version, path) = fs::read_dir(versions_dir)
         .unwrap()
         .filter_map(|entry| -> Option<(u64, PathBuf)> {
@@ -77,7 +77,7 @@ fn latest_executable_path(versions_dir: PathBuf) -> PathBuf {
     path.join(bin_path())
 }
 
-fn execute_info_path() -> Option<PathBuf> {
+pub fn execute_info_path() -> Option<PathBuf> {
     let env_skip_os_str = var_os("SC2_PROXY_SKIP_EXECUTE_INFO").unwrap_or_default();
     let env_skip_str = env_skip_os_str
         .to_str()
@@ -103,7 +103,7 @@ fn execute_info_path() -> Option<PathBuf> {
 }
 
 // Reads ExecuteInfo.txt, if available
-fn read_execute_info(path: PathBuf) -> Option<PathBuf> {
+pub fn read_execute_info(path: PathBuf) -> Option<PathBuf> {
     let mut f = fs::File::open(path).ok()?;
     let mut contents = String::new();
     f.read_to_string(&mut contents)
