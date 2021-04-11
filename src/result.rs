@@ -16,7 +16,9 @@ pub(crate) struct JsonResult {
     #[serde(default, rename = "Status")]
     status: String,
     #[serde(default, rename="Bots")]
-    bots: HashMap<u8, String>
+    bots: HashMap<u8, String>,
+    #[serde(default, rename="Map")]
+    map: String
 }
 impl JsonResult {
     pub(crate) fn from(
@@ -26,7 +28,8 @@ impl JsonResult {
         game_time_formatted: Option<String>,
         average_frame_time: Option<HashMap<String, f32>>,
         status: Option<String>,
-        bots: Option<HashMap<u8, String>>
+        bots: Option<HashMap<u8, String>>,
+        map: Option<String>
     ) -> Self {
         Self {
             result: result.unwrap_or_default(),
@@ -35,7 +38,8 @@ impl JsonResult {
             game_time_formatted: game_time_formatted.unwrap_or_default(),
             average_frame_time: average_frame_time.unwrap_or_default(),
             status: status.unwrap_or_default(),
-            bots: bots.unwrap_or_default()
+            bots: bots.unwrap_or_default(),
+            map: map.unwrap_or_default()
         }
     }
     pub(crate) fn serialize(&self) -> String {

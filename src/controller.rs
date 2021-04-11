@@ -406,7 +406,7 @@ impl Controller {
         if game_over {
             let game = self.game.take().unwrap();
             match game.collect_result() {
-                Ok((result, players)) => {
+                Ok((result, players)) => {                    
                     let average_frame_time: Option<HashMap<String, f32>>;
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
                     for p in players.into_iter() {
@@ -434,7 +434,11 @@ impl Controller {
                         None,
                         average_frame_time,
                         Some("Complete".to_string()),
-                        Some(bots)
+                        Some(bots),
+                        match self.config.as_ref(){
+                            Some(x) => Some(x.map.clone()),
+                            None => None
+                        }
                     );
                     self.send_message(j_result.serialize().as_ref());
 
