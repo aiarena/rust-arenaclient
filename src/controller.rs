@@ -426,7 +426,7 @@ impl Controller {
                     bots.insert(2, p2);
                     let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
                     info!("{:?}", game_result);
-
+                    
                     let j_result = JsonResult::from(
                         Some(game_result),
                         game_time,
@@ -437,6 +437,10 @@ impl Controller {
                         Some(bots),
                         match self.config.as_ref(){
                             Some(x) => Some(x.map.clone()),
+                            None => None
+                        },
+                        match self.config.as_ref(){
+                            Some(x) => Some(x.replay_name.clone()),
                             None => None
                         }
                     );
