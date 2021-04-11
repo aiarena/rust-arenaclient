@@ -1,8 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub(crate) struct JsonResult {
+    #[serde(default, rename = "MatchID")]
+    match_id: i64,
     #[serde(default, rename = "Result")]
     result: HashMap<String, String>,
     #[serde(default, rename = "GameTime")]
@@ -32,7 +35,8 @@ impl JsonResult {
         status: Option<String>,
         bots: Option<HashMap<u8, String>>,
         map: Option<String>,
-        replay_path: Option<String>
+        replay_path: Option<String>,
+        match_id: Option<i64>
     ) -> Self {
         Self {
             result: result.unwrap_or_default(),
@@ -43,7 +47,8 @@ impl JsonResult {
             status: status.unwrap_or_default(),
             bots: bots.unwrap_or_default(),
             map: map.unwrap_or_default(),
-            replay_path: replay_path.unwrap_or_default()
+            replay_path: replay_path.unwrap_or_default(),
+            match_id: match_id.unwrap_or_default()
         }
     }
     pub(crate) fn serialize(&self) -> String {

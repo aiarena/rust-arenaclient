@@ -442,6 +442,10 @@ impl Controller {
                         match self.config.as_ref(){
                             Some(x) => Some(x.replay_name.clone()),
                             None => None
+                        },
+                        match self.config.as_ref(){
+                            Some(x) => Some(x.match_id),
+                            None => None
                         }
                     );
                     self.send_message(j_result.serialize().as_ref());
