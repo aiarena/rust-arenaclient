@@ -417,10 +417,13 @@ impl Controller {
 
                     let p1 = self.config.clone().unwrap().player1();
                     let p2 = self.config.clone().unwrap().player2();
-                    let mut game_result = HashMap::with_capacity(2);
-                    game_result.insert(p1, player_results[0].to_string());
-                    game_result.insert(p2, player_results[1].to_string());
+                    let mut game_result = HashMap::with_capacity(1);
+                    game_result.insert(p1.clone(), player_results[0].to_string());
+                    game_result.insert(p2.clone(), player_results[1].to_string());
                     let game_time = Some(result.game_loops);
+                    let mut bots: HashMap<u8, String> = HashMap::with_capacity(1);
+                    bots.insert(1, p1);
+                    bots.insert(2, p2);
                     let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
                     info!("{:?}", game_result);
 
@@ -431,6 +434,7 @@ impl Controller {
                         None,
                         average_frame_time,
                         Some("Complete".to_string()),
+                        Some(bots)
                     );
                     self.send_message(j_result.serialize().as_ref());
 
