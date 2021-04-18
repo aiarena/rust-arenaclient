@@ -47,6 +47,7 @@ optional = true
 extension-module = ["bincode", "pyo3", "pyo3-log", "pyo3/extension-module"]
 default = ["extension-module"]
 no-pyo3 = []
+build = ["bincode", "pyo3", "pyo3-log"]
 
 
 
