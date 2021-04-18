@@ -1,16 +1,16 @@
 use crate::controller::{create_supervisor_listener, Controller, SupervisorAction};
 use crate::proxy;
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 use bincode::{deserialize, serialize};
 use crossbeam::channel::{self, TryRecvError};
 use log::info;
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 use pyo3::prelude::*;
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 use pyo3::types::{PyBytes, PyTuple};
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 use pyo3::ToPyObject;
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 use serde::{Deserialize, Serialize};
 use std::thread;
 use std::thread::JoinHandle;
@@ -18,7 +18,7 @@ pub enum ClientType {
     Bot,
     Controller,
 }
-#[cfg_attr(not(feature="no-pyo3"), derive(Serialize, Deserialize))]
+#[cfg_attr(not(feature = "no-pyo3"), derive(Serialize, Deserialize))]
 pub struct RustServer {
     ip_addr: String,
 }
@@ -73,7 +73,7 @@ impl RustServer {
                         controller.send_message("{\"Config\": \"Received\"}");
                     }
                     SupervisorAction::ForceQuit => break,
-                    SupervisorAction::Ping =>{
+                    SupervisorAction::Ping => {
                         controller.send_pong();
                     }
                     _ => {}
@@ -86,14 +86,14 @@ impl RustServer {
         })
     }
 }
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 #[pyclass(module = "rust_ac")]
 #[text_signature = "(ip_addr)"]
 pub(crate) struct PServer {
     server: Option<RustServer>,
 }
 
-#[cfg(not(feature="no-pyo3"))]
+#[cfg(not(feature = "no-pyo3"))]
 #[pymethods]
 impl PServer {
     #[new]
@@ -147,12 +147,12 @@ impl PServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(not(feature="no-pyo3"))]
+    #[cfg(not(feature = "no-pyo3"))]
     use pyo3::py_run;
-    #[cfg(not(feature="no-pyo3"))]
+    #[cfg(not(feature = "no-pyo3"))]
     use pyo3::types::PyDict;
 
-    #[cfg(not(feature="no-pyo3"))]
+    #[cfg(not(feature = "no-pyo3"))]
     fn add_module(py: Python, module: &PyModule) -> PyResult<()> {
         py.import("sys")?
             .dict()
@@ -162,7 +162,7 @@ mod tests {
             .set_item(module.name()?, module)
     }
 
-    #[cfg(not(feature="no-pyo3"))]
+    #[cfg(not(feature = "no-pyo3"))]
     #[test]
     fn test_pickle() {
         let gil = Python::acquire_gil();

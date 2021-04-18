@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub(crate) struct JsonResult {
     #[serde(default, rename = "MatchID")]
@@ -18,12 +17,12 @@ pub(crate) struct JsonResult {
     average_frame_time: HashMap<String, f32>,
     #[serde(default, rename = "Status")]
     status: String,
-    #[serde(default, rename="Bots")]
+    #[serde(default, rename = "Bots")]
     bots: HashMap<u8, String>,
-    #[serde(default, rename="Map")]
+    #[serde(default, rename = "Map")]
     map: String,
-    #[serde(default, rename="ReplayPath")]
-    replay_path: String
+    #[serde(default, rename = "ReplayPath")]
+    replay_path: String,
 }
 impl JsonResult {
     #[allow(clippy::too_many_arguments)]
@@ -37,7 +36,7 @@ impl JsonResult {
         bots: Option<HashMap<u8, String>>,
         map: Option<String>,
         replay_path: Option<String>,
-        match_id: Option<i64>
+        match_id: Option<i64>,
     ) -> Self {
         Self {
             result: result.unwrap_or_default(),
@@ -49,7 +48,7 @@ impl JsonResult {
             bots: bots.unwrap_or_default(),
             map: map.unwrap_or_default(),
             replay_path: replay_path.unwrap_or_default(),
-            match_id: match_id.unwrap_or_default()
+            match_id: match_id.unwrap_or_default(),
         }
     }
     pub(crate) fn serialize(&self) -> String {

@@ -102,7 +102,7 @@ impl Process {
     }
 }
 
-impl Default for Process{
+impl Default for Process {
     fn default() -> Self {
         Self::new()
     }
