@@ -13,6 +13,7 @@ pub mod result;
 pub mod sc2;
 pub mod sc2process;
 pub mod server;
+pub use websocket;
 
 #[cfg(not(feature = "no-pyo3"))]
 #[pymodule]
