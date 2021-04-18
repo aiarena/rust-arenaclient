@@ -1,3 +1,4 @@
+#[cfg(not(feature="no-pyo3"))]
 use pyo3::prelude::*;
 
 pub mod build_info;
@@ -13,6 +14,7 @@ pub mod sc2;
 pub mod sc2process;
 pub mod server;
 
+#[cfg(not(feature="no-pyo3"))]
 #[pymodule]
 fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
