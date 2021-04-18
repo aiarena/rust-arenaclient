@@ -101,3 +101,9 @@ impl Process {
         self.process.kill().expect("Could not kill SC2 process");
     }
 }
+
+impl Default for Process{
+    fn default() -> Self {
+        Self::new()
+    }
+}

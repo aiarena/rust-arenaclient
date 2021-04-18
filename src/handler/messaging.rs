@@ -80,6 +80,7 @@ pub enum ToGameContent {
     /// SC2 responded to `quit` request without the client leaving the handler
     QuitBeforeLeave,
     /// SC2 unexpectedly closed connection, usually user clicking the window close button
+    #[allow(clippy::upper_case_acronyms)]
     SC2UnexpectedConnectionClose,
     /// Client unexpectedly closed connection
     UnexpectedConnectionClose,

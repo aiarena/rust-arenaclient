@@ -26,6 +26,7 @@ pub(crate) struct JsonResult {
     replay_path: String
 }
 impl JsonResult {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn from(
         result: Option<HashMap<String, String>>,
         game_time: Option<u32>,

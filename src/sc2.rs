@@ -77,6 +77,7 @@ impl Default for Difficulty {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct BuiltinAI {
     pub race: Race,
@@ -90,6 +91,7 @@ pub enum PlayerResult {
     Defeat,
     Tie,
     Crash,
+    #[allow(clippy::upper_case_acronyms)]
     SC2Crash,
     Timeout,
 }
