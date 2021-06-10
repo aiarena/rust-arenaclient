@@ -167,7 +167,7 @@ impl Controller {
                 if self.connected_clients == 0 {
                     debug!("Adding {}", config.player1());
                     self.clients.push((
-                        (config.player1(), config.player1_bot_race()),
+                        (config.player1().to_string(), config.player1_bot_race()),
                         client,
                         None,
                     ));
@@ -180,7 +180,7 @@ impl Controller {
                 } else {
                     debug!("Adding {}", config.player2());
                     self.clients.push((
-                        (config.player2(), config.player2_bot_race()),
+                        (config.player2().to_string(), config.player2_bot_race()),
                         client,
                         None,
                     ));
@@ -410,13 +410,14 @@ impl Controller {
                     let average_frame_time: Option<HashMap<String, f32>>;
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
                     for p in players.into_iter() {
-                        avg_hash.insert(p.player_name().unwrap(), p.frame_time);
+                        avg_hash
+                            .insert(p.player_name().as_ref().unwrap().to_string(), p.frame_time);
                     }
                     average_frame_time = Some(avg_hash);
                     let player_results = result.player_results;
 
-                    let p1 = self.config.clone().unwrap().player1();
-                    let p2 = self.config.clone().unwrap().player2();
+                    let p1 = self.config.as_ref().unwrap().player1().to_string();
+                    let p2 = self.config.as_ref().unwrap().player2().to_string();
                     let mut game_result = HashMap::with_capacity(1);
                     game_result.insert(p1.clone(), player_results[0].to_string());
                     game_result.insert(p2.clone(), player_results[1].to_string());

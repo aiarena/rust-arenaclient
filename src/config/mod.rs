@@ -74,17 +74,17 @@ impl Config {
     pub fn realtime(&self) -> bool {
         self.real_time
     }
-    pub fn player1(&self) -> String {
-        self.player1.clone()
+    pub fn player1(&self) -> &str {
+        &self.player1
     }
-    pub fn player2(&self) -> String {
-        self.player2.clone()
+    pub fn player2(&self) -> &str {
+        &self.player2
     }
     pub fn max_game_time(&self) -> u32 {
         self.max_game_time
     }
-    pub fn replay_path(&self) -> String {
-        self.replay_path.clone()
+    pub fn replay_path(&self) -> &str {
+        &self.replay_path
     }
     pub fn light_mode(&self) -> bool {
         self.light_mode
@@ -92,16 +92,16 @@ impl Config {
     pub fn validate_race(&self) -> bool {
         self.validate_race
     }
-    pub fn player1_race(&self) -> Option<String> {
-        self.player1_race.clone()
+    pub fn player1_race(&self) -> &Option<String> {
+        &self.player1_race
     }
     pub fn player1_bot_race(&self) -> Option<Race> {
         self.player1_race
             .as_ref()
             .map(|string| BotRace::from_str(string).to_race())
     }
-    pub fn player2_race(&self) -> Option<String> {
-        self.player2_race.clone()
+    pub fn player2_race(&self) -> &Option<String> {
+        &self.player2_race
     }
     pub fn player2_bot_race(&self) -> Option<Race> {
         self.player2_race

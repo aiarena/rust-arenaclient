@@ -4,12 +4,12 @@ use std::fmt;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::time::Instant;
 
-use websocket::result::WebSocketError;
-use websocket::OwnedMessage;
-
 use protobuf::Clear;
 use protobuf::Message;
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
+use websocket::result::WebSocketError;
+use websocket::Message as WMessage;
+use websocket::OwnedMessage;
 
 use super::messaging::{ChannelToGame, ToGameContent};
 use crate::config::Config;
@@ -74,13 +74,13 @@ impl Player {
             player_id: None,
         }
     }
-    pub fn player_name(&self) -> Option<String> {
-        self.data.name.clone()
+    pub fn player_name(&self) -> &Option<String> {
+        &self.data.name
     }
     /// Send message to the client
-    fn client_send(&mut self, msg: &OwnedMessage) {
+    fn client_send(&mut self, msg: WMessage) {
         trace!("Sending message to client");
-        self.connection.send_message(msg).expect("Could not send");
+        self.connection.send_message(&msg).expect("Could not send");
     }
 
     /// Send a protobuf response to the client
@@ -89,16 +89,16 @@ impl Player {
             "Response to client: [{}]",
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
-        self.client_send(&OwnedMessage::Binary(
+        self.client_send(WMessage::binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
         ));
     }
-    pub fn client_respond_raw(&mut self, r: Vec<u8>) {
+    pub fn client_respond_raw(&mut self, r: &[u8]) {
         trace!(
             "Response to client: [{}]",
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
-        self.client_send(&OwnedMessage::Binary(r));
+        self.client_send(WMessage::binary(r));
     }
 
     /// Receive a message from the client
@@ -219,7 +219,7 @@ impl Player {
         self.sc2_recv_raw()
     }
     /// Saves replay to path
-    pub fn save_replay(&mut self, path: String) -> bool {
+    pub fn save_replay(&mut self, path: &str) -> bool {
         if path.is_empty() {
             return false;
         }
@@ -264,6 +264,7 @@ impl Player {
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
         let mut surrender = false;
+        let mut response_raw: Vec<u8>;
         // let mut crash = false;
 
         // if let Some(p) = gamec.recv() {
@@ -277,7 +278,6 @@ impl Player {
 
         // Get request
         while let Some(req_raw) = self.client_get_request_raw() {
-            req.clear();
             req.merge_from_bytes(&req_raw).ok()?;
 
             if start_timer {
@@ -294,7 +294,7 @@ impl Player {
             }
 
             // Send request to SC2 and get response
-            let mut response_raw = match self.sc2_query_raw(req_raw) {
+            response_raw = match self.sc2_query_raw(req_raw) {
                 Some(d) => d,
                 None => {
                     error!("SC2 unexpectedly closed the connection");
@@ -305,7 +305,6 @@ impl Player {
                 }
             };
 
-            response.clear();
             response.merge_from_bytes(&response_raw).ok()?;
             self.sc2_status = Some(response.get_status());
             if response.has_game_info() {
@@ -318,7 +317,7 @@ impl Player {
             }
 
             // Send SC2 response to client
-            self.client_respond_raw(response_raw);
+            self.client_respond_raw(&response_raw);
             start_timer = true;
             start_time = Instant::now();
 
@@ -380,8 +379,12 @@ impl Player {
                     return Some(self);
                 }
             } else if surrender {
-                self.save_replay(replay_path.clone());
+                self.save_replay(replay_path);
             }
+
+            clear_request(&mut req);
+            clear_response(&mut response);
+            response_raw.clear();
 
             // if let Some(msg) = gamec.recv() {
             //     return match msg {
@@ -481,4 +484,18 @@ impl Default for Visibility {
     fn default() -> Self {
         Visibility::Hidden
     }
+}
+
+pub fn clear_request(req: &mut Request) {
+    req.request = None;
+    req.id = None;
+    req.unknown_fields.clear();
+}
+
+pub fn clear_response(response: &mut Response) {
+    response.response = None;
+    response.id = None;
+    response.error.clear();
+    response.status = None;
+    response.unknown_fields.clear();
 }
