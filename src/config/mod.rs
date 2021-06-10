@@ -96,19 +96,17 @@ impl Config {
         self.player1_race.clone()
     }
     pub fn player1_bot_race(&self) -> Option<Race> {
-        match self.player1_race.clone() {
-            Some(string) => Some(BotRace::from_str(&*string).to_race()),
-            None => None,
-        }
+        self.player1_race
+            .as_ref()
+            .map(|string| BotRace::from_str(string).to_race())
     }
     pub fn player2_race(&self) -> Option<String> {
         self.player2_race.clone()
     }
     pub fn player2_bot_race(&self) -> Option<Race> {
-        match self.player2_race.clone() {
-            Some(string) => Some(BotRace::from_str(&*string).to_race()),
-            None => None,
-        }
+        self.player2_race
+            .as_ref()
+            .map(|string| BotRace::from_str(string).to_race())
     }
     pub fn archon(&self) -> bool {
         self.archon

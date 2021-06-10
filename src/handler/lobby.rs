@@ -209,6 +209,7 @@ impl GameLobby {
 }
 
 /// Used to pass player setup info to CreateGame
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 enum CreateGamePlayer {
     Participant,

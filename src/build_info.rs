@@ -29,19 +29,17 @@ impl BuildInfo {
             .expect("Could not find .build-info file");
 
         let mut build_info;
-        for result in rdr.deserialize::<BuildInfo>() {
-            if let Ok(x) = result {
-                build_info = x;
-                build_info.base_build = build_info
-                    .version
-                    .split('.')
-                    .last()
-                    .unwrap()
-                    .parse::<u32>()
-                    .unwrap();
-                build_info.data_build = build_info.base_build;
-                return build_info;
-            }
+        if let Some(result) = rdr.deserialize::<BuildInfo>().flatten().next() {
+            build_info = result;
+            build_info.base_build = build_info
+                .version
+                .split('.')
+                .last()
+                .unwrap()
+                .parse::<u32>()
+                .unwrap();
+            build_info.data_build = build_info.base_build;
+            return build_info;
         }
         BuildInfo::new()
     }

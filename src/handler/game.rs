@@ -72,7 +72,14 @@ impl Game {
             }
             ToGameContent::UnexpectedConnectionClose => {
                 info!("Unexpected connection close");
-                player_results[player_index] = Some(PlayerResult::Crash);
+                if player_results
+                    .iter()
+                    .any(|x| matches!(x, Some(PlayerResult::Crash)))
+                {
+                    player_results[player_index] = Some(PlayerResult::Victory);
+                } else {
+                    player_results[player_index] = Some(PlayerResult::Crash);
+                }
             }
         }
     }
