@@ -75,9 +75,13 @@ impl Game {
                 info!("Unexpected connection close");
                 if !player_results
                     .iter()
-                    .any(|x| matches!(x, Some(PlayerResult::Crash)))
+                    .enumerate()
+                    .any(|(idx, r)| idx != player_index && matches!(r, Some(PlayerResult::Crash)))
                 {
+                    debug!("Bot {:?} crashed", player_index);
                     player_results[player_index] = Some(PlayerResult::Crash);
+                } else {
+                    player_results[player_index] = Some(PlayerResult::Victory);
                 }
             }
         }
@@ -104,9 +108,7 @@ impl Game {
             handles.push(handle);
         }
 
-        while player_results.contains(&None)
-        //&& !player_results.contains(&Some(PlayerResult::Crash))
-        {
+        while player_results.contains(&None) {
             select! {
                 // A client ended the handler
                 recv(rx) -> r => match r {
