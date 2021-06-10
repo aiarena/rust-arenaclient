@@ -1,7 +1,7 @@
 import asyncio
 from .game_config import GameConfig
 from typing import Optional
-from urllib.parse import urlparse
+
 from aiohttp import ClientSession, WSMsgType, ClientConnectorError
 from .result import Result
 from datetime import datetime
@@ -51,6 +51,7 @@ class Supervisor:
             await asyncio.sleep(1)
             try:
                 session = ClientSession()
+                print(addr)
                 ws = await session.ws_connect(addr, headers=headers)
                 self._websocket = ws
                 self._session = session
@@ -62,7 +63,7 @@ class Supervisor:
 
     def _parse_url(self) -> str:
         addr = self.ip_address.replace("/sc2api", "")
-        return urlparse(addr, 'ws').geturl().replace("///", "//") + '/sc2api'
+        return "ws://" + addr + '/sc2api'
 
     def set_config(self, config: GameConfig):
         self._config = config
