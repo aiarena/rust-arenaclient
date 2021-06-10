@@ -8,51 +8,51 @@ use std::collections::HashMap;
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct Config {
     #[serde(default)]
-    pub(crate) pids: Vec<u32>,
+    pub pids: Vec<u32>,
     #[serde(default)]
-    pub(crate) average_frame_time: Vec<HashMap<String, f32>>,
+    pub average_frame_time: Vec<HashMap<String, f32>>,
     #[serde(default, alias = "Map")]
-    pub(crate) map: String,
+    pub map: String,
     #[serde(default, alias = "MaxGameTime")]
-    pub(crate) max_game_time: u32,
+    pub max_game_time: u32,
     #[serde(default, alias = "MaxFrameTime")]
-    pub(crate) max_frame_time: i32,
+    pub max_frame_time: i32,
     #[serde(default, alias = "Strikes")]
-    pub(crate) strikes: i32,
+    pub strikes: i32,
     #[serde(default)]
-    pub(crate) result: Vec<HashMap<String, String>>,
+    pub result: Vec<HashMap<String, String>>,
     #[serde(default, alias = "Player1")]
-    pub(crate) player1: String,
+    pub player1: String,
     #[serde(default, alias = "Player2")]
-    pub(crate) player2: String,
+    pub player2: String,
     #[serde(default, alias = "ReplayPath")]
-    pub(crate) replay_path: String,
+    pub replay_path: String,
     #[serde(default, alias = "MatchID")]
-    pub(crate) match_id: i64,
+    pub match_id: i64,
     #[serde(default, alias = "ReplayName")]
-    pub(crate) replay_name: String,
+    pub replay_name: String,
     #[serde(default)]
-    pub(crate) game_time: f32,
+    pub game_time: f32,
     #[serde(default)]
-    pub(crate) game_time_seconds: f32,
+    pub game_time_seconds: f32,
     #[serde(default)]
-    pub(crate) game_time_formatted: String,
+    pub game_time_formatted: String,
     #[serde(default, alias = "DisableDebug")]
-    pub(crate) disable_debug: bool,
+    pub disable_debug: bool,
     #[serde(default, alias = "RealTime")]
-    pub(crate) real_time: bool,
+    pub real_time: bool,
     #[serde(default, alias = "Visualize")]
-    pub(crate) visualize: bool,
+    pub visualize: bool,
     #[serde(default, alias = "LightMode")]
-    pub(crate) light_mode: bool,
+    pub light_mode: bool,
     #[serde(default, alias = "ValidateRace")]
-    pub(crate) validate_race: bool,
+    pub validate_race: bool,
     #[serde(default, alias = "Player1Race")]
-    pub(crate) player1_race: Option<String>,
+    pub player1_race: Option<String>,
     #[serde(default, alias = "Player2Race")]
-    pub(crate) player2_race: Option<String>,
+    pub player2_race: Option<String>,
     #[serde(default, alias = "Archon")]
-    pub(crate) archon: bool,
+    pub archon: bool,
 }
 impl Config {
     /// New default config

@@ -39,9 +39,9 @@ jobs:
     - name: Build lib
       run: cargo build --lib --verbose      
     - name: Build bin
-      run: cargo build --bin rust_ac_bin --no-default-features --verbose
+      run: cargo build --bin rust_ac_bin --no-default-features --verbose --features="build"
     - name: Run tests
-      run: cargo test --verbose --no-default-features
+      run: cargo test --verbose --no-default-features --features="build"
   
   maturin_build:
     runs-on: ${{ matrix.os }}

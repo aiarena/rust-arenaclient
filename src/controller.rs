@@ -33,6 +33,7 @@ pub enum SupervisorAction {
     NoAction,
     Received,
     Config(String),
+    Ping,
 }
 
 enum PlaylistAction {
@@ -112,7 +113,18 @@ impl Controller {
         self.game = None;
         self.connected_clients = 0;
     }
-
+    pub fn send_pong(&mut self) {
+        match &mut self.supervisor {
+            Some(sender) => {
+                sender
+                    .send_message(&ws_Message::pong(vec![0_u8]))
+                    .expect("Could not send message to supervisor");
+            }
+            None => {
+                error!("send_message: Supervisor not set");
+            }
+        }
+    }
     /// Sends a message to the supervisor
     pub fn send_message(&mut self, message: &str) {
         match &mut self.supervisor {
@@ -405,10 +417,13 @@ impl Controller {
 
                     let p1 = self.config.clone().unwrap().player1();
                     let p2 = self.config.clone().unwrap().player2();
-                    let mut game_result = HashMap::with_capacity(2);
-                    game_result.insert(p1, player_results[0].to_string());
-                    game_result.insert(p2, player_results[1].to_string());
+                    let mut game_result = HashMap::with_capacity(1);
+                    game_result.insert(p1.clone(), player_results[0].to_string());
+                    game_result.insert(p2.clone(), player_results[1].to_string());
                     let game_time = Some(result.game_loops);
+                    let mut bots: HashMap<u8, String> = HashMap::with_capacity(1);
+                    bots.insert(1, p1);
+                    bots.insert(2, p2);
                     let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
                     info!("{:?}", game_result);
 
@@ -419,6 +434,19 @@ impl Controller {
                         None,
                         average_frame_time,
                         Some("Complete".to_string()),
+                        Some(bots),
+                        match self.config.as_ref() {
+                            Some(x) => Some(x.map.clone()),
+                            None => None,
+                        },
+                        match self.config.as_ref() {
+                            Some(x) => Some(x.replay_name.clone()),
+                            None => None,
+                        },
+                        match self.config.as_ref() {
+                            Some(x) => Some(x.match_id),
+                            None => None,
+                        },
                     );
                     self.send_message(j_result.serialize().as_ref());
 
@@ -533,9 +561,10 @@ pub fn create_supervisor_listener(
 ) {
     thread::spawn(move || loop {
         let r_msg = client_recv.recv_message();
+        trace!("message received from supervisor client");
         match r_msg {
-            Ok(msg) => {
-                if let OwnedMessage::Text(data) = msg {
+            Ok(msg) => match msg {
+                OwnedMessage::Text(data) => {
                     if data == "Reset" {
                         sender
                             .send(SupervisorAction::Quit)
@@ -555,7 +584,14 @@ pub fn create_supervisor_listener(
                             .expect("Could not send ForceQuit");
                     }
                 }
-            }
+
+                OwnedMessage::Ping(_) => {
+                    sender
+                        .send(SupervisorAction::Ping)
+                        .expect("Could not send SupervisorAction");
+                }
+                _ => {}
+            },
             Err(WebSocketError::NoDataAvailable) => {
                 break;
             }
