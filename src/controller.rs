@@ -159,7 +159,7 @@ impl Controller {
             .expect("Could not set non-blocking");
         client
             .stream_ref()
-            .set_read_timeout(Some(Duration::new(40, 0)))
+            .set_read_timeout(Some(Duration::new(35, 0)))
             .expect("Could not set read timeout");
         debug_assert!(self.clients.len() < 2);
         match self.config.clone() {
@@ -435,18 +435,9 @@ impl Controller {
                         average_frame_time,
                         Some("Complete".to_string()),
                         Some(bots),
-                        match self.config.as_ref() {
-                            Some(x) => Some(x.map.clone()),
-                            None => None,
-                        },
-                        match self.config.as_ref() {
-                            Some(x) => Some(x.replay_name.clone()),
-                            None => None,
-                        },
-                        match self.config.as_ref() {
-                            Some(x) => Some(x.match_id),
-                            None => None,
-                        },
+                        self.config.as_ref().map(|x| x.map.clone()),
+                        self.config.as_ref().map(|x| x.replay_name.clone()),
+                        self.config.as_ref().map(|x| x.match_id),
                     );
                     self.send_message(j_result.serialize().as_ref());
 

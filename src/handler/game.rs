@@ -9,6 +9,7 @@ use std::thread;
 use super::any_panic_to_string;
 use super::messaging::{create_channels, FromSupervisor, ToGame, ToGameContent, ToSupervisor};
 use super::player::Player;
+// use crate::handler::messaging::ToPlayer;
 
 /// Game result data
 #[derive(Debug, Clone)]
@@ -72,12 +73,10 @@ impl Game {
             }
             ToGameContent::UnexpectedConnectionClose => {
                 info!("Unexpected connection close");
-                if player_results
+                if !player_results
                     .iter()
                     .any(|x| matches!(x, Some(PlayerResult::Crash)))
                 {
-                    player_results[player_index] = Some(PlayerResult::Victory);
-                } else {
                     player_results[player_index] = Some(PlayerResult::Crash);
                 }
             }
@@ -105,7 +104,9 @@ impl Game {
             handles.push(handle);
         }
 
-        while player_results.contains(&None) {
+        while player_results.contains(&None)
+        //&& !player_results.contains(&Some(PlayerResult::Crash))
+        {
             select! {
                 // A client ended the handler
                 recv(rx) -> r => match r {
@@ -136,6 +137,9 @@ impl Game {
         }
 
         info!("Game ready, results collected");
+        // for mut c in _to_player_channels {
+        //     c.send(ToPlayer::Quit);
+        // }
 
         // Wait until the games are ready
         let mut result_players: Vec<Player> = Vec::new();

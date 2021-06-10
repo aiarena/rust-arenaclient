@@ -11,8 +11,9 @@ use protobuf::Clear;
 use protobuf::Message;
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 
-use super::messaging::{ChannelToGame, ToGameContent, ToPlayer};
+use super::messaging::{ChannelToGame, ToGameContent};
 use crate::config::Config;
+
 use crate::proxy::Client;
 use crate::sc2::{PlayerResult, Race};
 use crate::sc2process::Process;
@@ -20,6 +21,7 @@ use std::fs::File;
 use std::io::Write;
 use std::thread;
 use std::thread::JoinHandle;
+
 /// Player process, connection and details
 pub struct Player {
     /// SC2 process for this player
@@ -262,94 +264,66 @@ impl Player {
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
         let mut surrender = false;
+        // let mut crash = false;
 
         // Get request
-        while let Some(req_raw) = self.client_get_request_raw() {
-            req.clear();
-            req.merge_from_bytes(&req_raw).ok()?;
+        #[allow(clippy::while_let_loop)]
+        loop {
+            // if let Some(p) = gamec.recv() {
+            //     match p {
+            //         ToPlayer::Quit => {
+            //             crash = true;
+            //             break;
+            //         }
+            //     }
+            // }
+            if let Some(req_raw) = self.client_get_request_raw() {
+                req.clear();
+                req.merge_from_bytes(&req_raw).ok()?;
 
-            if start_timer {
-                frame_time += start_time.elapsed().as_secs_f32();
-            }
-            // Check for debug requests
-            if config.disable_debug() && req.has_debug() {
-                debug_response.set_id(req.get_id());
-                self.client_respond(&debug_response);
-                continue;
-            } else if req.has_leave_game() {
-                surrender = true;
-            }
-
-            // Send request to SC2 and get response
-            let mut response_raw = match self.sc2_query_raw(req_raw) {
-                Some(d) => d,
-                None => {
-                    error!("SC2 unexpectedly closed the connection");
-                    gamec.send(ToGameContent::SC2UnexpectedConnectionClose);
-                    debug!("Killing the process");
-                    self.process.kill();
-                    return Some(self);
+                if start_timer {
+                    frame_time += start_time.elapsed().as_secs_f32();
                 }
-            };
+                // Check for debug requests
+                if config.disable_debug() && req.has_debug() {
+                    debug_response.set_id(req.get_id());
+                    self.client_respond(&debug_response);
+                    continue;
+                } else if req.has_leave_game() {
+                    surrender = true;
+                    break;
+                }
 
-            response.clear();
-            response.merge_from_bytes(&response_raw).ok()?;
-            self.sc2_status = Some(response.get_status());
-            if response.has_game_info() {
-                for pi in response.mut_game_info().mut_player_info().iter_mut() {
-                    if pi.get_player_id() != self.player_id.unwrap() {
-                        pi.race_actual = pi.race_requested;
+                // Send request to SC2 and get response
+                let mut response_raw = match self.sc2_query_raw(req_raw) {
+                    Some(d) => d,
+                    None => {
+                        error!("SC2 unexpectedly closed the connection");
+                        gamec.send(ToGameContent::SC2UnexpectedConnectionClose);
+                        debug!("Killing the process");
+                        self.process.kill();
+                        return Some(self);
                     }
-                }
-                response_raw = response.write_to_bytes().unwrap();
-            }
-
-            // Send SC2 response to client
-            self.client_respond_raw(response_raw);
-            start_timer = true;
-            start_time = Instant::now();
-
-            if response.has_quit() {
-                self.save_replay(replay_path);
-                self.frame_time = frame_time / self.game_loops as f32;
-                self.frame_time = if self.frame_time.is_nan() {
-                    0_f32
-                } else {
-                    self.frame_time
                 };
-                debug!("SC2 is shutting down");
-                gamec.send(ToGameContent::QuitBeforeLeave);
-                debug!("Waiting for the process");
-                self.process.wait();
-                return Some(self);
-            } else if response.has_observation() {
-                self.frame_time = frame_time / self.game_loops as f32;
-                self.frame_time = if self.frame_time.is_nan() {
-                    0_f32
-                } else {
-                    self.frame_time
-                };
-                let obs = response.get_observation();
-                let obs_results = obs.get_player_result();
-                self.game_loops = obs.get_observation().get_game_loop();
-                if !obs_results.is_empty() {
-                    // Game is over and results available
-                    let mut results_by_id: Vec<(u32, PlayerResult)> = obs_results
-                        .iter()
-                        .map(|r| (r.get_player_id(), PlayerResult::from_proto(r.get_result())))
-                        .collect();
-                    results_by_id.sort();
-                    let results: Vec<_> = results_by_id.into_iter().map(|(_, v)| v).collect();
-                    gamec.send(ToGameContent::GameOver((
-                        results,
-                        self.game_loops,
-                        self.frame_time,
-                    )));
-                    self.save_replay(replay_path);
-                    self.process.kill();
-                    return Some(self);
+
+                response.clear();
+                response.merge_from_bytes(&response_raw).ok()?;
+                self.sc2_status = Some(response.get_status());
+                if response.has_game_info() {
+                    for pi in response.mut_game_info().mut_player_info().iter_mut() {
+                        if pi.get_player_id() != self.player_id.unwrap() {
+                            pi.race_actual = pi.race_requested;
+                        }
+                    }
+                    response_raw = response.write_to_bytes().unwrap();
                 }
-                if self.game_loops > config.max_game_time() {
+
+                // Send SC2 response to client
+                self.client_respond_raw(response_raw);
+                start_timer = true;
+                start_time = Instant::now();
+
+                if response.has_quit() {
                     self.save_replay(replay_path);
                     self.frame_time = frame_time / self.game_loops as f32;
                     self.frame_time = if self.frame_time.is_nan() {
@@ -357,22 +331,39 @@ impl Player {
                     } else {
                         self.frame_time
                     };
-                    debug!("Max time reached");
-                    gamec.send(ToGameContent::GameOver((
-                        vec![PlayerResult::Tie, PlayerResult::Tie],
-                        self.game_loops,
-                        self.frame_time,
-                    )));
-                    self.process.kill();
+                    debug!("SC2 is shutting down");
+                    gamec.send(ToGameContent::QuitBeforeLeave);
+                    debug!("Waiting for the process");
+                    self.process.wait();
                     return Some(self);
-                }
-            } else if surrender {
-                self.save_replay(replay_path.clone());
-            }
-
-            if let Some(msg) = gamec.recv() {
-                return match msg {
-                    ToPlayer::Quit => {
+                } else if response.has_observation() {
+                    self.frame_time = frame_time / self.game_loops as f32;
+                    self.frame_time = if self.frame_time.is_nan() {
+                        0_f32
+                    } else {
+                        self.frame_time
+                    };
+                    let obs = response.get_observation();
+                    let obs_results = obs.get_player_result();
+                    self.game_loops = obs.get_observation().get_game_loop();
+                    if !obs_results.is_empty() {
+                        // Game is over and results available
+                        let mut results_by_id: Vec<(u32, PlayerResult)> = obs_results
+                            .iter()
+                            .map(|r| (r.get_player_id(), PlayerResult::from_proto(r.get_result())))
+                            .collect();
+                        results_by_id.sort();
+                        let results: Vec<_> = results_by_id.into_iter().map(|(_, v)| v).collect();
+                        gamec.send(ToGameContent::GameOver((
+                            results,
+                            self.game_loops,
+                            self.frame_time,
+                        )));
+                        self.save_replay(replay_path);
+                        self.process.kill();
+                        return Some(self);
+                    }
+                    if self.game_loops > config.max_game_time() {
                         self.save_replay(replay_path);
                         self.frame_time = frame_time / self.game_loops as f32;
                         self.frame_time = if self.frame_time.is_nan() {
@@ -380,17 +371,54 @@ impl Player {
                         } else {
                             self.frame_time
                         };
-                        debug!("Killing the process by request from the handler");
+                        debug!("Max time reached");
+                        gamec.send(ToGameContent::GameOver((
+                            vec![PlayerResult::Tie, PlayerResult::Tie],
+                            self.game_loops,
+                            self.frame_time,
+                        )));
                         self.process.kill();
-                        Some(self)
+                        return Some(self);
                     }
-                };
+                } else if surrender {
+                    self.save_replay(replay_path.clone());
+                }
+
+                // if let Some(msg) = gamec.recv() {
+                //     return match msg {
+                //         ToPlayer::Quit => {
+                //             self.save_replay(replay_path);
+                //             self.frame_time = frame_time / self.game_loops as f32;
+                //             self.frame_time = if self.frame_time.is_nan() {
+                //                 0_f32
+                //             } else {
+                //                 self.frame_time
+                //             };
+                //             debug!("Killing the process by request from the handler");
+                //             self.process.kill();
+                //             Some(self)
+                //         }
+                //     };
+                // }
+            } else {
+                break;
             }
         }
 
         // Connection already closed
         // Populate result if bot has left the game, otherwise it will show as
         // a crash
+        // if crash {
+        //     let mut results: Vec<PlayerResult> = vec![PlayerResult::Crash; 2];
+        //     results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Victory;
+        //     gamec.send(ToGameContent::GameOver((
+        //         results,
+        //         self.game_loops,
+        //         self.frame_time,
+        //     )));
+        //     self.process.kill();
+        //     return Some(self);
+        // }
         if surrender {
             let mut results: Vec<PlayerResult> = vec![PlayerResult::Victory; 2];
             results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Defeat;
