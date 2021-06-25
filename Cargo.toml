@@ -36,7 +36,6 @@ pyo3-log = {version="^0.3.0", optional=true}
 [dependencies.websocket]
 git = "https://github.com/aiarena/rust-websocket"
 default-features = false
-features = ["sync"]
 
 [dependencies.pyo3]
 version = "^0.13"

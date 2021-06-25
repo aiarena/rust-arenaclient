@@ -44,20 +44,22 @@ impl Game {
         player_results: &mut Vec<Option<PlayerResult>>,
         game_loops: &mut u32,
         frame_times: &mut [f32; 2],
+        tags: &mut [Vec<String>; 2],
     ) {
         let ToGame {
             player_index,
             content,
         } = msg;
         match content {
-            ToGameContent::GameOver(results) => {
+            ToGameContent::GameOver(game_over) => {
                 for (i, item) in player_results.iter_mut().enumerate() {
                     if item.is_none() {
-                        *item = Some(results.0[i])
+                        *item = Some(game_over.results[i])
                     }
                 }
-                *game_loops = results.1;
-                frame_times[player_index] = results.2;
+                *game_loops = game_over.game_loops;
+                frame_times[player_index] = game_over.frame_time;
+                tags[player_index] = game_over.tags;
             }
             ToGameContent::LeftGame => {
                 info!("Player left handler before it was over");
@@ -98,6 +100,7 @@ impl Game {
         let mut handles: Vec<thread::JoinHandle<Option<Player>>> = Vec::new();
         let mut game_loops = 0_u32;
         let mut frame_times: [f32; 2] = [0_f32, 0_f32];
+        let mut tags: [Vec<String>; 2] = [vec![], vec![]];
         let (rx, mut _to_player_channels, player_channels) = create_channels(self.players.len());
         let mut player_results: Vec<Option<PlayerResult>> = vec![None; self.players.len()];
 
@@ -113,7 +116,7 @@ impl Game {
                 // A client ended the handler
                 recv(rx) -> r => match r {
                     Ok(msg) => {
-                        Self::process_msg(msg, &mut player_results, &mut game_loops, &mut frame_times);
+                        Self::process_msg(msg, &mut player_results, &mut game_loops, &mut frame_times, &mut tags);
                     },
                     Err(e) => panic!("Player channel closed without sending results {:?}",e),
                 },

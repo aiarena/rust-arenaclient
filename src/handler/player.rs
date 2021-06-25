@@ -14,9 +14,11 @@ use websocket::OwnedMessage;
 use super::messaging::{ChannelToGame, ToGameContent};
 use crate::config::Config;
 
+use crate::handler::messaging::GameOver;
 use crate::proxy::Client;
 use crate::sc2::{PlayerResult, Race};
 use crate::sc2process::Process;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::thread;
@@ -40,6 +42,8 @@ pub struct Player {
     pub frame_time: f32,
     /// Player id
     pub player_id: Option<u32>,
+    /// Tags
+    pub tags: HashSet<String>,
 }
 
 impl Player {
@@ -57,6 +61,7 @@ impl Player {
                 data,
                 frame_time: 0_f32,
                 player_id: None,
+                tags: Default::default(),
             }
         })
     }
@@ -72,6 +77,7 @@ impl Player {
             data,
             frame_time: 0_f32,
             player_id: None,
+            tags: Default::default(),
         }
     }
     pub fn player_name(&self) -> &Option<String> {
@@ -292,6 +298,22 @@ impl Player {
                 surrender = true;
                 break;
             }
+            for tag in req
+                .get_action()
+                .actions
+                .iter()
+                .filter(|a| a.has_action_chat() && a.get_action_chat().has_message())
+                .filter_map(|x| {
+                    let msg = x.get_action_chat().get_message();
+                    if msg.contains("Tag:") {
+                        msg.strip_prefix("Tag:").map(String::from)
+                    } else {
+                        None
+                    }
+                })
+            {
+                self.tags.insert(tag);
+            }
 
             // Send request to SC2 and get response
             response_raw = match self.sc2_query_raw(req_raw) {
@@ -352,11 +374,12 @@ impl Player {
                         .collect();
                     results_by_id.sort();
                     let results: Vec<_> = results_by_id.into_iter().map(|(_, v)| v).collect();
-                    gamec.send(ToGameContent::GameOver((
+                    gamec.send(ToGameContent::GameOver(GameOver {
                         results,
-                        self.game_loops,
-                        self.frame_time,
-                    )));
+                        game_loops: self.game_loops,
+                        frame_time: self.frame_time,
+                        tags: self.tags.iter().cloned().collect(),
+                    }));
                     self.save_replay(replay_path);
                     self.process.kill();
                     return Some(self);
@@ -370,11 +393,12 @@ impl Player {
                         self.frame_time
                     };
                     debug!("Max time reached");
-                    gamec.send(ToGameContent::GameOver((
-                        vec![PlayerResult::Tie, PlayerResult::Tie],
-                        self.game_loops,
-                        self.frame_time,
-                    )));
+                    gamec.send(ToGameContent::GameOver(GameOver {
+                        results: vec![PlayerResult::Tie, PlayerResult::Tie],
+                        game_loops: self.game_loops,
+                        frame_time: self.frame_time,
+                        tags: self.tags.iter().cloned().collect(),
+                    }));
                     self.process.kill();
                     return Some(self);
                 }
@@ -421,11 +445,12 @@ impl Player {
         if surrender {
             let mut results: Vec<PlayerResult> = vec![PlayerResult::Victory; 2];
             results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Defeat;
-            gamec.send(ToGameContent::GameOver((
+            gamec.send(ToGameContent::GameOver(GameOver {
                 results,
-                self.game_loops,
-                self.frame_time,
-            )));
+                game_loops: self.game_loops,
+                frame_time: self.frame_time,
+                tags: self.tags.iter().cloned().collect(),
+            }));
             self.process.kill();
             return Some(self);
         }

@@ -26,6 +26,8 @@ class Result:
         self.bot1_avg_frame = 0
         self.bot2_avg_frame = 0
         self.winner = None
+        self.bot1_tags = None
+        self.bot2_tags = None
 
     def __repr__(self):
         return f"""
@@ -53,6 +55,8 @@ class Result:
             "Bot1AvgFrame": self.bot1_avg_frame,
             "Bot2AvgFrame": self.bot2_avg_frame,
             'ReplayPath': self.replay_path,
+            'Bot1Tags': self.bot1_tags,
+            'Bot2Tags': self.bot2_tags
         }
 
     def has_result(self):
@@ -128,6 +132,10 @@ class Result:
 
         if result.get("TimeStamp", None):
             self.time_stamp = result["TimeStamp"]
+
+        if result.get("Tags", None):
+            self.bot1_tags = result['Tags'].get(self.bot1, [])
+            self.bot2_tags = result['Tags'].get(self.bot2, [])
 
         if self.replay_path is None:
             self.replay_path = os.path.join(
