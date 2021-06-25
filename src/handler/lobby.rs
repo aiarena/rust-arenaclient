@@ -86,7 +86,7 @@ impl GameLobby {
         r_create_game.set_local_map(r_local_map);
         r_create_game.set_realtime(self.config.realtime());
 
-        let p_cfgs: Vec<_> = players.iter().map(CreateGamePlayer::to_proto).collect();
+        let p_cfgs: Vec<_> = players.iter().map(CreateGamePlayer::as_proto).collect();
         r_create_game.set_player_setup(RepeatedField::from_vec(p_cfgs));
 
         let mut request = Request::new();
@@ -216,7 +216,7 @@ enum CreateGamePlayer {
     Observer,
 }
 impl CreateGamePlayer {
-    fn to_proto(&self) -> sc2_proto::sc2api::PlayerSetup {
+    fn as_proto(&self) -> sc2_proto::sc2api::PlayerSetup {
         use sc2_proto::sc2api::{PlayerSetup, PlayerType};
         let mut ps = PlayerSetup::new();
         match self {

@@ -23,6 +23,8 @@ pub(crate) struct JsonResult {
     map: String,
     #[serde(default, rename = "ReplayPath")]
     replay_path: String,
+    #[serde(default, rename = "Tags")]
+    tags: HashMap<String, Vec<String>>,
 }
 impl JsonResult {
     #[allow(clippy::too_many_arguments)]
@@ -37,6 +39,7 @@ impl JsonResult {
         map: Option<String>,
         replay_path: Option<String>,
         match_id: Option<i64>,
+        tags: Option<HashMap<String, Vec<String>>>,
     ) -> Self {
         Self {
             result: result.unwrap_or_default(),
@@ -49,6 +52,7 @@ impl JsonResult {
             map: map.unwrap_or_default(),
             replay_path: replay_path.unwrap_or_default(),
             match_id: match_id.unwrap_or_default(),
+            tags: tags.unwrap_or_default(),
         }
     }
     pub(crate) fn serialize(&self) -> String {

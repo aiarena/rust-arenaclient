@@ -74,7 +74,7 @@ pub struct ToGame {
 #[derive(Debug, Clone)]
 pub enum ToGameContent {
     /// Game ended normally
-    GameOver((Vec<PlayerResult>, u32, f32)),
+    GameOver(GameOver),
     /// SC2 responded to `leave_game` request
     LeftGame,
     /// SC2 responded to `quit` request without the client leaving the handler
@@ -85,7 +85,13 @@ pub enum ToGameContent {
     /// Client unexpectedly closed connection
     UnexpectedConnectionClose,
 }
-
+#[derive(Debug, Clone)]
+pub struct GameOver {
+    pub(crate) results: Vec<PlayerResult>,
+    pub(crate) game_loops: u32,
+    pub(crate) frame_time: f32,
+    pub(crate) tags: Vec<String>,
+}
 /// Channel from the handler to a player
 #[derive(Clone)]
 pub struct ChannelToPlayer {
