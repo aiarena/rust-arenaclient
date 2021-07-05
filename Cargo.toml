@@ -38,7 +38,7 @@ git = "https://github.com/aiarena/rust-websocket"
 default-features = false
 
 [dependencies.pyo3]
-version = "^0.13"
+version = "^0.14"
 optional = true
 
 
