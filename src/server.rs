@@ -88,7 +88,7 @@ impl RustServer {
 }
 #[cfg(not(feature = "no-pyo3"))]
 #[pyclass(module = "rust_ac")]
-#[text_signature = "(ip_addr)"]
+#[pyo3(text_signature = "(ip_addr)")]
 pub(crate) struct PServer {
     server: Option<RustServer>,
 }
