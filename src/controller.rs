@@ -407,17 +407,16 @@ impl Controller {
             let game = self.game.take().unwrap();
             match game.collect_result() {
                 Ok((result, players)) => {
-                    let average_frame_time: Option<HashMap<String, f32>>;
+
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-                    let tags: Option<HashMap<String, Vec<String>>>;
                     let mut tags_hash: HashMap<String, Vec<String>> = HashMap::with_capacity(2);
                     for p in players.iter() {
                         let player_name = p.player_name().as_ref().unwrap().to_string();
                         avg_hash.insert(player_name.clone(), p.frame_time);
                         tags_hash.insert(player_name.clone(), p.tags.iter().cloned().collect());
                     }
-                    tags = Some(tags_hash);
-                    average_frame_time = Some(avg_hash);
+                    let tags: Option<HashMap<String, Vec<String>>> = Some(tags_hash);
+                    let average_frame_time: Option<HashMap<String, f32>> = Some(avg_hash);
 
                     let player_results = result.player_results;
 

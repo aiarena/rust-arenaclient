@@ -17,12 +17,9 @@ use websocket::ClientBuilder;
 use crate::paths;
 
 /// SC2 process
-#[derive(Debug)]
 pub struct Process {
     /// The actual SC2 process
     process: Child,
-    /// Temp data dir used by SC2
-    tempdir: TempDir,
     /// WebSocket port
     ws_port: u16,
 }
@@ -53,7 +50,6 @@ impl Process {
 
         Self {
             process,
-            tempdir,
             ws_port,
         }
     }

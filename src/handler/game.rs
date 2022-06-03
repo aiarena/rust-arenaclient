@@ -41,7 +41,7 @@ impl Game {
     /// Process a message from player thread
     fn process_msg(
         msg: ToGame,
-        player_results: &mut Vec<Option<PlayerResult>>,
+        player_results: &mut [Option<PlayerResult>],
         game_loops: &mut u32,
         frame_times: &mut [f32; 2],
         tags: &mut [Vec<String>; 2],
