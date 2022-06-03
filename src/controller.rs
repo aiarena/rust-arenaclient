@@ -407,7 +407,6 @@ impl Controller {
             let game = self.game.take().unwrap();
             match game.collect_result() {
                 Ok((result, players)) => {
-
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
                     let mut tags_hash: HashMap<String, Vec<String>> = HashMap::with_capacity(2);
                     for p in players.iter() {

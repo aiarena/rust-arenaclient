@@ -48,10 +48,7 @@ impl Process {
         .spawn()
         .expect("Could not launch SC2 process");
 
-        Self {
-            process,
-            ws_port,
-        }
+        Self { process, ws_port }
     }
 
     /// Connect the process websocket
