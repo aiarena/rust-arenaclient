@@ -1,2 +1,2 @@
-portpicker==1.4.0
+portpicker==1.5.0
 aiohttp>=3.7.4
