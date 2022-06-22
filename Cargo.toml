@@ -20,7 +20,7 @@ requires-dist = ["portpicker", "aiohttp"]
 
 [dependencies]
 sc2-proto = { git = "https://github.com/UltraMachine/sc2-proto-rs.git" }
-protobuf = { version = "^2.20.0", features = ["with-bytes"] }
+protobuf = { version = "^3.1.0", features = ["with-bytes"] }
 log = "^0.4.13"
 shellexpand = "^2.1.0"
 regex = "^1.4.3"
