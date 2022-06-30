@@ -14,10 +14,12 @@ use pyo3::ToPyObject;
 use serde::{Deserialize, Serialize};
 use std::thread;
 use std::thread::JoinHandle;
+
 pub enum ClientType {
     Bot,
     Controller,
 }
+
 #[cfg_attr(not(feature = "no-pyo3"), derive(Serialize, Deserialize))]
 pub struct RustServer {
     ip_addr: String,
@@ -86,6 +88,7 @@ impl RustServer {
         })
     }
 }
+
 #[cfg(not(feature = "no-pyo3"))]
 #[pyclass(module = "rust_ac")]
 #[pyo3(text_signature = "(ip_addr)")]
@@ -102,7 +105,7 @@ impl PServer {
         match args.len() {
             0 => Self { server: None },
             1 => {
-                if let Ok(f) = args.get_item(0).extract::<&str>() {
+                if let Ok(f) = args.get_item(0).and_then(|x| x.extract::<&str>()) {
                     Self {
                         server: Some(RustServer::new(f)),
                     }
@@ -144,6 +147,7 @@ impl PServer {
         Ok(PyBytes::new(py, &serialize(&self.server).unwrap()).to_object(py))
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
