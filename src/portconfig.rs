@@ -53,7 +53,7 @@ mod tests {
         let mut request = RequestJoinGame::new();
         let port_config = PortConfig::new().expect("Could not create port config");
         port_config.apply_proto(&mut request, false);
-        assert!(request.has_server_ports());
+        assert!(request.server_ports.is_some());
         assert!(request.has_shared_port());
     }
 }
