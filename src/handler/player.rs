@@ -4,7 +4,6 @@ use std::fmt;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::time::Instant;
 
-use protobuf::Clear;
 use protobuf::Message;
 use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 use websocket::result::WebSocketError;
@@ -235,7 +234,7 @@ impl Player {
             if response.has_save_replay() {
                 match File::create(&path) {
                     Ok(mut buffer) => {
-                        let data: &[u8] = response.get_save_replay().get_data();
+                        let data: &[u8] = response.save_replay().data();
                         buffer
                             .write_all(data)
                             .expect("Could not write to replay file");
@@ -291,7 +290,7 @@ impl Player {
             }
             // Check for debug requests
             if config.disable_debug() && req.has_debug() {
-                debug_response.set_id(req.get_id());
+                debug_response.set_id(req.id());
                 self.client_respond(&debug_response);
                 continue;
             } else if req.has_leave_game() {
@@ -299,12 +298,12 @@ impl Player {
                 break;
             }
             for tag in req
-                .get_action()
+                .action()
                 .actions
                 .iter()
-                .filter(|a| a.has_action_chat() && a.get_action_chat().has_message())
+                .filter(|a| a.action_chat.has_message())
                 .filter_map(|x| {
-                    let msg = x.get_action_chat().get_message();
+                    let msg = x.action_chat.message();
                     if msg.contains("Tag:") {
                         msg.strip_prefix("Tag:").map(String::from)
                     } else {
@@ -328,10 +327,10 @@ impl Player {
             };
 
             response.merge_from_bytes(&response_raw).ok()?;
-            self.sc2_status = Some(response.get_status());
+            self.sc2_status = Some(response.status());
             if response.has_game_info() {
-                for pi in response.mut_game_info().mut_player_info().iter_mut() {
-                    if pi.get_player_id() != self.player_id.unwrap() {
+                for pi in response.mut_game_info().player_info.iter_mut() {
+                    if pi.player_id() != self.player_id.unwrap() {
                         pi.race_actual = pi.race_requested;
                     }
                 }
@@ -363,14 +362,14 @@ impl Player {
                 } else {
                     self.frame_time
                 };
-                let obs = response.get_observation();
-                let obs_results = obs.get_player_result();
-                self.game_loops = obs.get_observation().get_game_loop();
+                let obs = response.observation();
+                let obs_results = &obs.player_result;
+                self.game_loops = obs.observation.game_loop();
                 if !obs_results.is_empty() {
                     // Game is over and results available
                     let mut results_by_id: Vec<(u32, PlayerResult)> = obs_results
                         .iter()
-                        .map(|r| (r.get_player_id(), PlayerResult::from_proto(r.get_result())))
+                        .map(|r| (r.player_id(), PlayerResult::from_proto(r.result())))
                         .collect();
                     results_by_id.sort();
                     let results: Vec<_> = results_by_id.into_iter().map(|(_, v)| v).collect();
@@ -484,14 +483,14 @@ pub struct PlayerData {
 impl PlayerData {
     pub fn from_join_request(req: RequestJoinGame, archon: bool) -> Self {
         Self {
-            race: Race::from_proto(req.get_race()),
+            race: Race::from_proto(req.race()),
             name: if req.has_player_name() {
-                Some(req.get_player_name().to_owned())
+                Some(req.player_name().to_owned())
             } else {
                 None
             },
             ifopts: {
-                let mut ifopts = req.get_options().clone();
+                let mut ifopts = req.options.unwrap();
                 ifopts.set_raw_affects_selection(!archon);
                 ifopts
             },
@@ -514,7 +513,7 @@ impl Default for Visibility {
 pub fn clear_request(req: &mut Request) {
     req.request = None;
     req.id = None;
-    req.unknown_fields.clear();
+    req.mut_unknown_fields().clear();
 }
 
 pub fn clear_response(response: &mut Response) {
@@ -522,5 +521,5 @@ pub fn clear_response(response: &mut Response) {
     response.id = None;
     response.error.clear();
     response.status = None;
-    response.unknown_fields.clear();
+    response.mut_unknown_fields().clear();
 }
