@@ -13,6 +13,7 @@ pub mod server;
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     let s = server::RustServer::new("127.0.0.1:8642");
     s.run().await.expect("Could not join");
 }

@@ -106,8 +106,9 @@ impl Game {
         // Run games
         for (p, c) in self.players.into_iter().zip(player_channels) {
             let thread_config: Config = self.config.clone();
-            let handle = tokio::spawn(async move { p.run(thread_config, c).await});
-            handles.push(handle);
+            handles.push(tokio::spawn(async move {
+                p.run(thread_config, c).await
+            }));
         }
 
         while player_results.contains(&None) {
@@ -141,9 +142,6 @@ impl Game {
         }
 
         info!("Game ready, results collected");
-        // for mut c in _to_player_channels {
-        //     c.send(ToPlayer::Quit);
-        // }
 
         // Wait until the games are ready
         let mut result_players: Vec<Player> = Vec::new();

@@ -2,7 +2,7 @@
 
 use std::net::SocketAddr;
 use crossbeam::channel::Sender;
-use futures_util::{StreamExt};
+use futures_util::{ StreamExt};
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use crate::server::ClientType;
 use log::info;
@@ -48,16 +48,9 @@ impl Client {
 async fn get_connection(server: &mut TcpListener) -> Option<(ClientType, Client)> {
     let mut is_supervisor = false;
     let callback = |req: &Request, response: Response| {
-        println!("Received a new ws handshake");
-        println!("The request's path is: {}", req.uri().path());
-        println!("The request's headers are:");
         if req.headers().contains_key("supervisor") {
             is_supervisor = true;
         }
-        for (ref header, _value) in req.headers() {
-            println!("* {}", header);
-        }
-
         Ok(response)
     };
     let config = Some(WebSocketConfig {

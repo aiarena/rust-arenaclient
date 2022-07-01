@@ -1,11 +1,11 @@
 //! Bot player participant
-use log::{debug, error, info, trace};
-use std::{fmt, thread};
-use std::time::Instant;
+use log::{debug, error, info, trace, warn};
+use std::{fmt};
+use std::time::{Duration, Instant};
 
 use protobuf::Clear;
 use protobuf::Message;
-use sc2_proto::sc2api::{Request, Request_oneof_request, RequestJoinGame, RequestSaveReplay, Response, Status};
+use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
 use tokio_tungstenite::tungstenite::Message as TMessage;
 
 use super::messaging::{ChannelToGame, ToGameContent};
@@ -17,11 +17,13 @@ use crate::sc2::{PlayerResult, Race};
 use crate::sc2process::Process;
 use std::collections::HashSet;
 use std::fs::File;
+use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::io::Write;
-use std::thread::JoinHandle;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
+use tokio::time::timeout;
 use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::Error;
 
 /// Player process, connection and details
 pub struct Player {
@@ -30,7 +32,7 @@ pub struct Player {
     /// SC2 websocket connection
     sc2_ws: WebSocketStream<TcpStream>,
     /// Proxy connection to connected client
-    connection: Client,
+    client_ws: Client,
     /// Status of the connected sc2 process
     sc2_status: Option<Status>,
     /// Additonal data
@@ -43,33 +45,31 @@ pub struct Player {
     pub player_id: Option<u32>,
     /// Tags
     pub tags: HashSet<String>,
+    response: Response,
+    request: Request
 }
 
 impl Player {
     /// Creates new player instance and initializes sc2 process for it
-    pub async fn new(connection: Client, data: PlayerData) -> JoinHandle<Self> {
-        thread::spawn(|| {
-            let rt = tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            rt.spawn(
+    pub async fn new(connection: Client, data: PlayerData) -> tokio::task::JoinHandle<Player> {
+        tokio::task::spawn(
             async {
                 let process = Process::new();
                 let sc2_ws = process.connect().await.expect("Could not connect");
                 Self {
                     process,
                     sc2_ws,
-                    connection,
                     sc2_status: None,
                     game_loops: 0,
                     data,
                     frame_time: 0_f32,
                     player_id: None,
                     tags: Default::default(),
+                    response: Default::default(),
+                    client_ws: connection,
+                    request: Default::default()
                 }
-            }).expect("COuld not something something") //todo:lol
-        })
+            })
     }
     pub async fn new_no_thread(connection: Client, data: PlayerData) -> Self {
         let process = Process::new();
@@ -77,13 +77,15 @@ impl Player {
         Self {
             process,
             sc2_ws,
-            connection,
+            client_ws: connection,
             sc2_status: None,
             game_loops: 0,
             data,
             frame_time: 0_f32,
             player_id: None,
             tags: Default::default(),
+            response: Default::default(),
+            request: Default::default()
         }
     }
     pub fn player_name(&self) -> &Option<String> {
@@ -91,14 +93,14 @@ impl Player {
     }
     /// Send message to the client
     async fn client_send(&mut self, msg: TMessage) {
-        trace!("Sending message to client");
-        self.connection.send_message(msg).await.expect("Could not send");
+        trace!("{:?}: Sending message to client", self.player_id);
+        self.client_ws.send_message(msg).await.expect("Could not send");
     }
 
     /// Send a protobuf response to the client
     pub async fn client_respond(&mut self, r: &Response) {
-        trace!(
-            "Response to client: [{}]",
+        trace!("{:?}:
+            Response to client: [{}]",self.player_id,
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
         self.client_send(TMessage::binary(
@@ -107,7 +109,7 @@ impl Player {
     }
     pub async fn client_respond_raw(&mut self, r: &[u8]) {
         trace!(
-            "Response to client: [{}]",
+            "{:?}: Response to client: [{}]", self.player_id,
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
         self.client_send(TMessage::binary(r)).await;
@@ -115,77 +117,73 @@ impl Player {
 
     /// Receive a message from the client
     /// Returns None if the connection is already closed
-    #[must_use]
-    async fn client_recv(&mut self) -> Option<TMessage> {
-        trace!("Waiting for a message from the client");
-        match self.connection.recv_message().await? {
-            Ok(msg) => {
-                trace!("Message received");
-                Some(msg)
+    async fn client_recv(&mut self) -> anyhow::Result<TMessage> {
+        trace!("{:?}: Waiting for a message from the client",self.player_id);
+        if let Some(res_msg) = self.client_ws.recv_message().await{
+            match res_msg{
+                Ok(msg) => {
+                    trace!("{:?}: Message received from client:\n{:?}", self.player_id, &msg);
+                    return Ok(msg);
+                }
+                Err(Error::Io(e)) if e.kind() == ConnectionReset => {
+                    error!(
+                    "Client closed connection unexpectedly (connection reset)\nAddress:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                    self.client_ws.peer_addr(), self.player_id, self.data.name,e
+                );
+                    return Err(anyhow::Error::from(e));
+                }
+                Err(Error::Io(e)) if e.kind() == ConnectionAborted => {
+                    warn!(
+                    "Client closed connection unexpectedly (connection abort)\nAddress:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                    self.client_ws.peer_addr(),self.player_id, self.data.name,e
+                );
+                    return Err(anyhow::Error::new(e));
+                }
+                Err(Error::Io(e)) if e.kind() == TimedOut => {
+                    warn!(
+                    "Client stopped responding\nAddress:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                    self.client_ws.peer_addr(),self.player_id, self.data.name,e
+                );
+                    return Err(anyhow::Error::new(e));
+                }
+                Err(Error::Io(e)) if e.kind() == WouldBlock => {
+                    warn!(
+                    "Client stopped responding\nAddress:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                    self.client_ws.peer_addr(), self.player_id, self.data.name,e
+                );
+                    return Err(anyhow::Error::new(e));
+                }
+                Err(err) => panic!("Could not receive: Address:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                                   self.client_ws.peer_addr(), self.player_id, self.data.name, &err)
             }
-            // Err(WebSocketError::NoDataAvailable) => {
-            //     warn!(
-            //         "Client {:?} closed connection unexpectedly (ws disconnect)",
-            //         self.connection.peer_addr().expect("PeerAddr")
-            //     );
-            //     None
-            // }
-            // Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionReset => {
-            //     warn!(
-            //         "Client {:?} closed connection unexpectedly (connection reset)",
-            //         self.connection.peer_addr().expect("PeerAddr")
-            //     );
-            //     None
-            // }
-            // Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
-            //     warn!(
-            //         "Client {:?} closed connection unexpectedly (connection abort)",
-            //         self.connection.peer_addr().expect("PeerAddr")
-            //     );
-            //     None
-            // }
-            // Err(WebSocketError::IoError(ref e)) if e.kind() == TimedOut => {
-            //     warn!(
-            //         "Client {:?} stopped responding",
-            //         self.connection.peer_addr().expect("PeerAddr")
-            //     );
-            //     None
-            // }
-            // Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {
-            //     warn!(
-            //         "Client {:?} stopped responding",
-            //         self.connection.peer_addr().expect("PeerAddr")
-            //     );
-            //     None
-            // }
-            Err(err) => panic!("Could not receive: {:?}", err),
         }
+        Err(anyhow::Error::msg("Message is None"))
     }
 
     /// Get a protobuf request from the client
     /// Returns None if the connection is already closed
-    pub async fn client_get_request(&mut self) -> Option<Request> {
+    pub async fn client_get_request(&mut self) -> anyhow::Result<Request> {
         match self.client_recv().await? {
             TMessage::Binary(bytes) => {
                 let resp = Message::parse_from_bytes(&bytes).expect("Invalid protobuf message");
-                Some(resp)
+                trace!("{:?} Message from client parsed:\n{:?}", self.player_id, &resp);
+                Ok(resp)
             }
-            TMessage::Close(_) => None,
+            TMessage::Close(e) => Err(anyhow::Error::msg(format!("{:?}",e))),
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
 
-    pub async fn client_get_request_raw(&mut self) -> Option<Vec<u8>> {
+    pub async fn client_get_request_raw(&mut self) -> anyhow::Result<Vec<u8>> {
         match self.client_recv().await? {
-            TMessage::Binary(bytes) => Some(bytes),
-            TMessage::Close(_) => None,
+            TMessage::Binary(bytes) => Ok(bytes),
+            TMessage::Close(e) => Err(anyhow::Error::msg(format!("{:?}", e))),
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
 
     /// Send message to sc2
     /// Returns None if the connection is already closed
-    #[must_use]
     async fn sc2_send(&mut self, msg: TMessage) -> Option<()> {
         self.sc2_ws.send(msg).await.ok()
     }
@@ -193,12 +191,12 @@ impl Player {
     /// Send protobuf request to sc2
     /// Returns None if the connection is already closed
     pub async fn sc2_request(&mut self, r: &Request) -> Option<()> {
-        self.sc2_send(TMessage::Binary(
+        self.sc2_send(TMessage::binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
         )).await
     }
     pub async fn sc2_request_raw(&mut self, r: Vec<u8>) -> Option<()> {
-        self.sc2_send(TMessage::Binary(r)).await
+        self.sc2_send(TMessage::binary(r)).await
     }
 
     /// Wait and receive a protobuf request from sc2
@@ -208,7 +206,9 @@ impl Player {
             TMessage::Binary(bytes) => {
                 Some(Message::parse_from_bytes(&bytes).expect("Invalid data"))
             }
-            TMessage::Close(_) => None,
+            TMessage::Close(_) => {
+                None
+            }
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
@@ -224,10 +224,6 @@ impl Player {
     /// Returns None if the connection is already closed
     pub async fn sc2_query(&mut self, r: &Request) -> Option<Response> {
         self.sc2_request(r).await?;
-        if let Request_oneof_request::step(x) = &r.request.as_ref().unwrap() {
-            println!("{:?}", x);
-            println!("{:?}", self.player_id);
-        }
         self.sc2_recv().await
     }
     pub async fn sc2_query_raw(&mut self, r: Vec<u8>) -> Option<Vec<u8>> {
@@ -249,66 +245,53 @@ impl Player {
                         buffer
                             .write_all(data)
                             .expect("Could not write to replay file");
-                        info!("Replay saved to {:?}", &path);
+                        info!("{:?}: Replay saved to {:?}", self.player_id,&path);
                         true
                     }
                     Err(e) => {
-                        error!("Failed to create replay file {:?}: {:?}", &path, e);
+                        error!("{:?}:Failed to create replay file {:?}: {:?}", self.player_id,&path, e);
                         false
                     }
                 }
             } else {
-                error!("No replay data available");
+                error!("{:?}:No replay data available",self.player_id);
                 false
             }
         } else {
-            error!("Could not save replay");
+            error!("{:?}:Could not save replay",self.player_id);
             false
         }
     }
+
     /// Run handler communication loop
-    #[must_use]
     pub async fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
         let mut debug_response = Response::new();
         debug_response.set_id(0);
         debug_response.set_status(Status::in_game);
-        let mut response = Response::new();
-        let mut req = Request::new();
-
+        let timeout_secs = Duration::from_secs(40);
         let replay_path = config.replay_path();
         let mut start_timer = false;
         let mut frame_time = 0_f32;
         let mut start_time: Instant = Instant::now();
         let mut surrender = false;
         let mut response_raw: Vec<u8>;
-        // let mut crash = false;
-
-        // if let Some(p) = gamec.recv() {
-        //     match p {
-        //         ToPlayer::Quit => {
-        //             crash = true;
-        //             break;
-        //         }
-        //     }
-        // }
-
+        
         // Get request
-        while let Some(req) = self.client_get_request().await {//todo:Change back to raw
-            // req.merge_from_bytes(&req_raw).ok()?;
-
+        while let Ok(Ok(req_raw)) = timeout(timeout_secs, self.client_get_request_raw()).await {
+            self.request.merge_from_bytes(&req_raw).ok()?;
             if start_timer {
                 frame_time += start_time.elapsed().as_secs_f32();
             }
             // Check for debug requests
-            if config.disable_debug() && req.has_debug() {
-                debug_response.set_id(req.get_id());
+            if config.disable_debug() && self.request.has_debug() {
+                debug_response.set_id(self.request.get_id());
                 self.client_respond(&debug_response).await;
                 continue;
-            } else if req.has_leave_game() {
+            } else if self.request.has_leave_game() {
                 surrender = true;
                 break;
             }
-            for tag in req
+            for tag in self.request
                 .get_action()
                 .actions
                 .iter()
@@ -326,34 +309,35 @@ impl Player {
             }
 
             // Send request to SC2 and get response
-            response = match self.sc2_query(&req).await {
-                Some(d) => d,
+            response_raw = match self.sc2_query_raw(req_raw).await {
+                Some(d) => {
+                    d
+                }
                 None => {
-                    error!("SC2 unexpectedly closed the connection");
+                    error!("{:?}: SC2 unexpectedly closed the connection",self.player_id);
                     gamec.send(ToGameContent::SC2UnexpectedConnectionClose);
-                    debug!("Killing the process");
+                    debug!("{:?}: Killing the process",self.player_id);
                     self.process.kill();
                     return Some(self);
                 }
             };
-
-            // response.merge_from_bytes(&response_raw).ok()?;
-            self.sc2_status = Some(response.get_status());
-            if response.has_game_info() {
-                for pi in response.mut_game_info().mut_player_info().iter_mut() {
+            self.response.merge_from_bytes(&response_raw).ok()?;
+            self.sc2_status = Some(self.response.get_status());
+            if self.response.has_game_info() {
+                for pi in self.response.mut_game_info().mut_player_info().iter_mut() {
                     if pi.get_player_id() != self.player_id.unwrap() {
                         pi.race_actual = pi.race_requested;
                     }
                 }
-                // response_raw = response.write_to_bytes().unwrap();
+                response_raw = self.response.write_to_bytes().unwrap();
             }
 
             // Send SC2 response to client
-            self.client_respond(&response).await;
+            self.client_respond_raw(&response_raw).await;
             start_timer = true;
             start_time = Instant::now();
 
-            if response.has_quit() {
+            if self.response.has_quit() {
                 self.save_replay(replay_path).await;
                 self.frame_time = frame_time / self.game_loops as f32;
                 self.frame_time = if self.frame_time.is_nan() {
@@ -361,19 +345,19 @@ impl Player {
                 } else {
                     self.frame_time
                 };
-                debug!("SC2 is shutting down");
+                debug!("{:?}: SC2 is shutting down",self.player_id);
                 gamec.send(ToGameContent::QuitBeforeLeave);
-                debug!("Waiting for the process");
+                debug!("{:?}: Waiting for the process",self.player_id);
                 self.process.wait();
                 return Some(self);
-            } else if response.has_observation() {
+            } else if self.response.has_observation() {
                 self.frame_time = frame_time / self.game_loops as f32;
                 self.frame_time = if self.frame_time.is_nan() {
                     0_f32
                 } else {
                     self.frame_time
                 };
-                let obs = response.get_observation();
+                let obs = self.response.get_observation();
                 let obs_results = obs.get_player_result();
                 self.game_loops = obs.get_observation().get_game_loop();
                 if !obs_results.is_empty() {
@@ -402,7 +386,7 @@ impl Player {
                     } else {
                         self.frame_time
                     };
-                    debug!("Max time reached");
+                    debug!("{:?}: Max time reached",self.player_id);
                     gamec.send(ToGameContent::GameOver(GameOver {
                         results: vec![PlayerResult::Tie, PlayerResult::Tie],
                         game_loops: self.game_loops,
@@ -416,42 +400,11 @@ impl Player {
                 self.save_replay(replay_path).await;
             }
 
-            // clear_request(&mut req);
-            clear_response(&mut response);
-            // response_raw.clear();
+            clear_request(&mut self.request);
+            clear_response(&mut self.response);
+            response_raw.clear();
 
-            // if let Some(msg) = gamec.recv() {
-            //     return match msg {
-            //         ToPlayer::Quit => {
-            //             self.save_replay(replay_path);
-            //             self.frame_time = frame_time / self.game_loops as f32;
-            //             self.frame_time = if self.frame_time.is_nan() {
-            //                 0_f32
-            //             } else {
-            //                 self.frame_time
-            //             };
-            //             debug!("Killing the process by request from the handler");
-            //             self.process.kill();
-            //             Some(self)
-            //         }
-            //     };
-            // }
         }
-
-        // Connection already closed
-        // Populate result if bot has left the game, otherwise it will show as
-        // a crash
-        // if crash {
-        //     let mut results: Vec<PlayerResult> = vec![PlayerResult::Crash; 2];
-        //     results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Victory;
-        //     gamec.send(ToGameContent::GameOver((
-        //         results,
-        //         self.game_loops,
-        //         self.frame_time,
-        //     )));
-        //     self.process.kill();
-        //     return Some(self);
-        // }
         if surrender {
             let mut results: Vec<PlayerResult> = vec![PlayerResult::Victory; 2];
             results[(self.player_id.unwrap() - 1) as usize] = PlayerResult::Defeat;
@@ -465,17 +418,11 @@ impl Player {
             return Some(self);
         }
         gamec.send(ToGameContent::UnexpectedConnectionClose);
-        info!("Killing process after unexpected connection close (Crash)");
+        info!("{:?}: Killing process after unexpected connection close (Crash or Timeout)", self.player_id);
         self.process.kill();
         Some(self)
     }
 
-    /// Terminate the process, and return the client
-    pub fn extract_client(mut self) -> Client {
-        assert_eq!(self.sc2_status, Some(Status::launched));
-        self.process.kill();
-        self.connection
-    }
 }
 
 impl fmt::Debug for Player {
@@ -489,7 +436,7 @@ impl fmt::Debug for Player {
 pub struct PlayerData {
     pub race: Race,
     pub name: Option<String>,
-    pub ifopts: sc2_proto::sc2api::InterfaceOptions,
+    pub interface_options: sc2_proto::sc2api::InterfaceOptions,
 }
 
 impl PlayerData {
@@ -501,7 +448,7 @@ impl PlayerData {
             } else {
                 None
             },
-            ifopts: {
+            interface_options: {
                 let mut ifopts = req.get_options().clone();
                 ifopts.set_raw_affects_selection(!archon);
                 ifopts

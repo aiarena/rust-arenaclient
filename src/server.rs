@@ -13,6 +13,7 @@ use pyo3::ToPyObject;
 #[cfg(not(feature = "no-pyo3"))]
 use serde::{Deserialize, Serialize};
 use futures_util::{ StreamExt};
+use tokio::runtime::Runtime;
 
 pub enum ClientType {
     Bot,
@@ -117,31 +118,20 @@ impl PServer {
             _ => unreachable!(),
         }
     }
-    pub fn run<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let server = self.server.clone();
-        // pyo3_asyncio::tokio::future_into_py(py, async move {
-        //     tokio::time::sleep(Duration::from_secs(10)).await;
-        //     Python::with_gil(|py| Ok(py.None()))
-        // })
-        match server {
-            Some(server) =>
-                pyo3_asyncio::tokio::future_into_py(py, async move {
+    pub fn run(&self, py: Python) -> Result<(), PyErr> {
+        match &self.server {
+            Some(server) => py.allow_threads(move || {
+                info!("Starting server on {:?}", server.ip_addr);
+                let rt = Runtime::new().unwrap();
+                rt.block_on(async move {
                     match server.run().await {
-                        Ok(_) => Ok(()),
-                        Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
-                            "Could not start server. Address in use {:?}",
-                        )),
-                    }.unwrap();
-                    Python::with_gil(|py| Ok(py.None()))
+                                            Ok(_) => Ok(()),
+                                            Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
+                                                "Could not start server. Address in use {:?}",
+                                            )),
+                                        }
                 })
-            // info!("Starting server on {:?}", server.ip_addr);
-            // match server.run().await {
-            //     Ok(_) => Ok(()),
-            //     Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
-            //         "Could not start server. Address in use {:?}",
-            //     )),
-            // }
-            ,
+            }),
             None => Err(pyo3::exceptions::PyAssertionError::new_err(
                 "Server not set. Did you initialize the object?",
             )),

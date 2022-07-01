@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::build_info::BuildInfo;
 use crate::config::Config;
 use crate::handler::{
-    spawn as spawn_game, FromSupervisor, GameLobby, Handle as GameHandle, PlayerNum,
+    spawn_game, FromSupervisor, GameLobby, Handle as GameHandle, PlayerNum,
 };
 use crate::proxy::Client;
 use crate::result::JsonResult;
@@ -17,6 +17,7 @@ use crate::sc2::Race;
 use crossbeam::channel::{Receiver, Sender};
 use protobuf::Message;
 use tokio_tungstenite::tungstenite::Message as TMessage;
+use tokio_tungstenite::tungstenite::error::Error;
 use sc2_proto::{self, sc2api::RequestJoinGame};
 use std::collections::HashMap;
 use futures_util::{SinkExt, StreamExt};
@@ -155,13 +156,6 @@ impl Controller {
     /// Add a new client socket to playlist
     pub fn add_client(&mut self, client: Client) {
         info!("Added client {:?}", client.peer_addr());
-        // client
-        //     .set_nonblocking(true)
-        //     .expect("Could not set non-blocking"); //todo: double check
-        // client
-        //     .stream.
-        //     .set_read_timeout(Some(Duration::new(35, 0)))
-        //     .expect("Could not set read timeout");//todo: double check
         debug_assert!(self.clients.len() < 2);
         match self.config.clone() {
             Some(config) => {
@@ -265,10 +259,6 @@ impl Controller {
             error!("Client attempted to join a handler twice (dropping connection)");
             return None;
         }
-
-        // client
-        //     .set_nonblocking(false)
-        //     .expect("Could not set non-blocking"); //todo: double check
         // TODO: Verify that InterfaceOptions are allowed
         // TODO: Fix this so it works without lobbies
         let player = match client_name.clone() {
@@ -277,6 +267,7 @@ impl Controller {
             _ => panic!(),
         };
         if self.lobby.is_some() {
+            trace!("Lobby exists");
             let mut lobby = self.lobby.take().unwrap();
             lobby.join(
                 client,
@@ -289,6 +280,7 @@ impl Controller {
             let game = lobby.start().await?;
             self.game = Some(spawn_game(game));
         } else if self.create_lobby() {
+            trace!("Create new lobby");
             let lobby = self.lobby.as_mut().unwrap();
             lobby.join(
                 client,
@@ -385,7 +377,6 @@ impl Controller {
                         }
                     }
                 },
-                //Err(Error::) if e.kind() == WouldBlock => {} //Todo: double check
                 None => {
                     error!("None message");
                 }
@@ -453,70 +444,12 @@ impl Controller {
                     }
                     self.drop_supervisor().await;
                     self.reset();
-                    // println!("Game result: {:?}", result);
                 }
                 Err(msg) => {
                     error!("Game thread panicked with: {:?}", msg);
                 }
             }
         }
-        // let mut games_over = Vec::new();
-        // for (id, game) in self.game.iter_mut() {
-        //     if game.check() {
-        //         println!("Game over");
-        //         games_over.push(*id);
-        //     }
-        // }
-        //
-        // for id in games_over {
-        //     let game = self.game.remove(&id).unwrap();
-        //     // let average_frame_time: Option<HashMap<String, f32>>;
-        //     // let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-        //     // for p in handler.players.iter(){
-        //     //     avg_hash.insert(p.player_name().unwrap(), p.frame_time);
-        //     // }
-        //     // average_frame_time = Some(avg_hash);
-        //     match game.collect_result() {
-        //         Ok((result, players)) => {
-        //             let average_frame_time: Option<HashMap<String, f32>>;
-        //             let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
-        //             for p in players.into_iter() {
-        //                 avg_hash.insert(p.player_name().unwrap(), p.frame_time);
-        //             }
-        //             average_frame_time = Some(avg_hash);
-        //             let player_results = result.player_results;
-        //
-        //             let p1 = self.config.clone().unwrap().clone().player1();
-        //             let p2 = self.config.clone().unwrap().clone().player2();
-        //             let mut game_result = HashMap::with_capacity(2);
-        //             game_result.insert(p1.clone(), player_results[0].to_string());
-        //             game_result.insert(p2.clone(), player_results[1].to_string());
-        //             let game_time = Some(result.game_loops);
-        //             let game_time_seconds = Some(game_time.unwrap() as f64 / 22.4);
-        //             println!("{:?}", game_result);
-        //
-        //             let j_result = JsonResult::from(
-        //                 Some(game_result),
-        //                 game_time,
-        //                 game_time_seconds,
-        //                 None,
-        //                 average_frame_time,
-        //                 Some("Complete".to_string()),
-        //             );
-        //             self.send_message(j_result.serialize().as_ref());
-        //             self.receive_confirmation();
-        //             for i in (0..self.clients.len()).rev() {
-        //                 self.drop_client(i)
-        //             }
-        //             self.drop_supervisor();
-        //             self.reset();
-        //             // println!("Game result: {:?}", result);
-        //         }
-        //         Err(msg) => {
-        //             error!("Game thread panicked with: {:?}", msg);
-        //         }
-        //     }
-        // }
     }
 
     /// Destroys the controller, ending all games,
@@ -559,57 +492,58 @@ pub async fn create_supervisor_listener(
 ) {
     tokio::spawn(async move {
         loop {
-            let r_msg = client_recv.next().await.unwrap();
-            trace!("Message received from supervisor client");
-            match r_msg {
-                Ok(msg) => match msg {
-                    TMessage::Text(data) => {
-                        if data == "Reset" {
-                            sender
-                                .send(SupervisorAction::Quit)
-                                .expect("Could not send SupervisorAction");
-                            break;
-                        } else if data == "Received" {
-                            sender
-                                .send(SupervisorAction::Received)
-                                .expect("Could not send SupervisorAction");
-                        } else if data.contains("Map") || data.contains("map") {
-                            sender
-                                .send(SupervisorAction::Config(data))
-                                .expect("Could not send config");
-                        } else if data == "Quit" {
-                            sender
-                                .send(SupervisorAction::ForceQuit)
-                                .expect("Could not send ForceQuit");
+            if let Some(r_msg) = client_recv.next().await {
+                trace!("Message received from supervisor client");
+                match r_msg {
+                    Ok(msg) => match msg {
+                        TMessage::Text(data) => {
+                            if data == "Reset" {
+                                sender
+                                    .send(SupervisorAction::Quit)
+                                    .expect("Could not send SupervisorAction");
+                                break;
+                            } else if data == "Received" {
+                                sender
+                                    .send(SupervisorAction::Received)
+                                    .expect("Could not send SupervisorAction");
+                            } else if data.contains("Map") || data.contains("map") {
+                                sender
+                                    .send(SupervisorAction::Config(data))
+                                    .expect("Could not send config");
+                            } else if data == "Quit" {
+                                sender
+                                    .send(SupervisorAction::ForceQuit)
+                                    .expect("Could not send ForceQuit");
+                            }
                         }
-                    }
-                    TMessage::Ping(_) => {
+                        TMessage::Ping(_) => {
+                            sender
+                                .send(SupervisorAction::Ping)
+                                .expect("Could not send SupervisorAction");
+                        }
+                        _ => {}
+                    },
+                    Err(Error::AlreadyClosed) => {
+                        error!("Supervisor Error::AlreadyClosed");
                         sender
-                            .send(SupervisorAction::Ping)
-                            .expect("Could not send SupervisorAction");
+                            .send(SupervisorAction::ForceQuit)
+                            .expect("Could not send ForceQuit");
+                        break;
                     }
-                    _ => {}
-                },
-                Err(tokio_tungstenite::tungstenite::error::Error::AlreadyClosed) => {
-                    error!("Supervisor Error::AlreadyClosed");
-                    sender
-                        .send(SupervisorAction::ForceQuit)
-                        .expect("Could not send ForceQuit");
-                    break;
-                }
-                Err(tokio_tungstenite::tungstenite::error::Error::Capacity(e)) => {
-                    error!("{:?}", e);
-                    sender
-                        .send(SupervisorAction::ForceQuit)
-                        .expect("Could not send ForceQuit");
-                    break;
-                }
-                Err(e) => {
-                    error!("{:?}", e);
-                    sender
-                        .send(SupervisorAction::ForceQuit)
-                        .expect("Could not send ForceQuit");
-                    break;
+                    Err(Error::Capacity(e)) => {
+                        error!("{:?}", e);
+                        sender
+                            .send(SupervisorAction::ForceQuit)
+                            .expect("Could not send ForceQuit");
+                        break;
+                    }
+                    Err(e) => {
+                        error!("{:?}", e);
+                        sender
+                            .send(SupervisorAction::ForceQuit)
+                            .expect("Could not send ForceQuit");
+                        break;
+                    }
                 }
             }
         }

@@ -1,10 +1,10 @@
 //! Game manages a single unstarted handler, including its configuration
 
-use log::{error, info};
+use log::{error, info, trace};
 
 use protobuf::RepeatedField;
 use sc2_proto::sc2api::RequestJoinGame;
-use std::thread::JoinHandle;
+use tokio::task::JoinHandle;
 
 use crate::maps::find_map;
 use crate::portconfig::PortConfig;
@@ -37,7 +37,7 @@ impl GameLobby {
     pub async fn join_player_handles(&mut self) {
         while let Some(handle) = self.player_handles.pop() {
             // self.players.push(handle.join().unwrap());
-            self.players.insert(0, handle.join().unwrap());
+            self.players.insert(0, handle.await.unwrap());
         }
     }
     /// Checks if this lobby has any player participants
@@ -59,6 +59,7 @@ impl GameLobby {
             pd.race = client_data.1.unwrap();
         }
         pd.name = Some(client_data.0);
+        trace!("Player {:?} with peer addr {:?} is player {:?}",&pd.name,connection.peer_addr(), player);
         if must_join {
             match player {
                 PlayerNum::One => self
@@ -96,16 +97,12 @@ impl GameLobby {
 
     /// Create the handler using the first client
     /// Returns None if handler join fails (connection close or sc2 process close)
-    #[must_use]
     pub async fn create_game(&mut self) -> Option<()> {
         assert!(!self.players.is_empty());
 
         // Craft CrateGame request
         let player_configs: Vec<CreateGamePlayer> =
             vec![CreateGamePlayer::Participant; self.players.len()];
-
-        // TODO: Human players?
-        // TODO: Observers?
 
         // Send CreateGame request to first process
         let proto = self.proto_create_game(player_configs);
@@ -129,15 +126,15 @@ impl GameLobby {
     /// Protobuf to join a handler
     fn proto_join_game_participant(
         &self,
-        portconfig: PortConfig,
+        port_config: PortConfig,
         player_data: PlayerData,
     ) -> sc2_proto::sc2api::Request {
         use sc2_proto::sc2api::Request;
 
         let mut r_join_game = RequestJoinGame::new();
-        r_join_game.set_options(player_data.ifopts);
+        r_join_game.set_options(player_data.interface_options);
         r_join_game.set_race(player_data.race.to_proto());
-        portconfig.apply_proto(&mut r_join_game, self.players.len() == 1);
+        port_config.apply_proto(&mut r_join_game, self.players.len() == 1);
 
         if let Some(name) = player_data.name {
             r_join_game.set_player_name(name);
@@ -149,7 +146,6 @@ impl GameLobby {
 
     /// Joins all participants to games
     /// Returns None iff handler join fails (connection close or sc2 process close)
-    #[must_use]
     pub async fn join_all_game(&mut self) -> Option<()> {
         let pc = PortConfig::new().expect("Unable to find free ports");
 
@@ -176,6 +172,7 @@ impl GameLobby {
             }
 
             // No error, pass through the response
+            trace!("Sending response to client number {:?}\n\n\n{:?}", player.player_id, &response);
             player.client_respond(&response).await;
         }
 
@@ -188,7 +185,6 @@ impl GameLobby {
     /// Start the handler, and send responses to join requests
     /// Returns None if handler create or join fails (connection close or sc2 process close)
     /// In that case, the connections are dropped (closed).
-    #[must_use]
     pub async fn start(mut self) -> Option<Game> {
         self.create_game().await?;
         self.join_all_game().await?;
@@ -201,7 +197,7 @@ impl GameLobby {
     /// Destroy the lobby, closing all the connections
     pub async fn close(&mut self) {
         while let Some(handle) = self.player_handles.pop() {
-            if let Ok(mut p) = handle.join() {
+            if let Ok(mut p) = handle.await {
                 p.process.kill()
             }
         }
