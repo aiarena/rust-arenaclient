@@ -1,9 +1,7 @@
 //! Game manages a single unstarted handler, including its configuration
 
-
 use log::{error, info, trace};
 use protobuf::{EnumOrUnknown, MessageField};
-
 
 use sc2_proto::sc2api::RequestJoinGame;
 use tokio::task::JoinHandle;
@@ -139,10 +137,10 @@ impl GameLobby {
         use sc2_proto::sc2api::Request;
 
         let mut r_join_game = RequestJoinGame::new();
-        
-        r_join_game.options = MessageField::from_option(Some(player_data.ifopts));
+
+        r_join_game.options = MessageField::from_option(Some(player_data.interface_options));
         r_join_game.set_race(player_data.race.to_proto());
-        
+
         port_config.apply_proto(&mut r_join_game, self.players.len() == 1);
 
         if let Some(name) = player_data.name {

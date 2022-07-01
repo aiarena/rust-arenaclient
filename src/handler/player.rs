@@ -319,7 +319,6 @@ impl Player {
             for tag in self
                 .request
                 .action()
-
                 .actions
                 .iter()
                 .filter(|a| a.action_chat.has_message())
