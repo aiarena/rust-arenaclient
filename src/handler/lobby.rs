@@ -1,8 +1,10 @@
 //! Game manages a single unstarted handler, including its configuration
 
-use log::{error, info, trace};
 
-use protobuf::RepeatedField;
+use log::{error, info, trace};
+use protobuf::{EnumOrUnknown, MessageField};
+
+
 use sc2_proto::sc2api::RequestJoinGame;
 use tokio::task::JoinHandle;
 
@@ -96,8 +98,7 @@ impl GameLobby {
         r_create_game.set_local_map(r_local_map);
         r_create_game.set_realtime(self.config.realtime());
 
-        let p_cfgs: Vec<_> = players.iter().map(CreateGamePlayer::as_proto).collect();
-        r_create_game.set_player_setup(RepeatedField::from_vec(p_cfgs));
+        r_create_game.player_setup = players.iter().map(CreateGamePlayer::as_proto).collect();
 
         let mut request = Request::new();
         request.set_create_game(r_create_game);
@@ -118,12 +119,9 @@ impl GameLobby {
         let response = self.players[0].sc2_query(&proto).await?;
 
         assert!(response.has_create_game());
-        let resp_create_game = response.get_create_game();
+        let resp_create_game = response.create_game();
         if resp_create_game.has_error() {
-            error!(
-                "Could not create handler: {:?}",
-                resp_create_game.get_error()
-            );
+            error!("Could not create handler: {:?}", resp_create_game.error());
             return None;
         } else {
             info!("Game created successfully");
@@ -141,8 +139,10 @@ impl GameLobby {
         use sc2_proto::sc2api::Request;
 
         let mut r_join_game = RequestJoinGame::new();
-        r_join_game.set_options(player_data.interface_options);
+        
+        r_join_game.options = MessageField::from_option(Some(player_data.ifopts));
         r_join_game.set_race(player_data.race.to_proto());
+        
         port_config.apply_proto(&mut r_join_game, self.players.len() == 1);
 
         if let Some(name) = player_data.name {
@@ -171,10 +171,10 @@ impl GameLobby {
         for player in self.players.iter_mut() {
             let response = player.sc2_recv().await?;
             assert!(response.has_join_game());
-            let resp_join_game = response.get_join_game();
-            player.player_id = Some(resp_join_game.get_player_id());
+            let resp_join_game = response.join_game();
+            player.player_id = Some(resp_join_game.player_id());
             if resp_join_game.has_error() {
-                error!("Could not join handler: {:?}", resp_join_game.get_error());
+                error!("Could not join handler: {:?}", resp_join_game.error());
                 return None;
             } else {
                 info!("Game join successful");
@@ -230,10 +230,10 @@ impl CreateGamePlayer {
         let mut ps = PlayerSetup::new();
         match self {
             Self::Participant => {
-                ps.set_field_type(PlayerType::Participant);
+                ps.type_ = Some(EnumOrUnknown::new(PlayerType::Participant));
             }
             Self::Observer => {
-                ps.set_field_type(PlayerType::Observer);
+                ps.type_ = Some(EnumOrUnknown::new(PlayerType::Observer));
             }
         }
         ps

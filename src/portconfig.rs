@@ -1,8 +1,8 @@
 //! Full port configuration
 
 use portpicker::pick_unused_port;
+use protobuf::MessageField;
 
-use protobuf::RepeatedField;
 use sc2_proto::sc2api::{PortSet, RequestJoinGame};
 
 /// Full set of ports needed by SC2
@@ -34,12 +34,12 @@ impl PortConfig {
             let mut server_ps = PortSet::new();
             server_ps.set_game_port(self.server_game as i32);
             server_ps.set_base_port(self.server_base as i32);
-            req.set_server_ports(server_ps);
+            req.server_ports = MessageField::from_option(Some(server_ps));
 
             let mut client_ps = PortSet::new();
             client_ps.set_game_port(self.client_game as i32);
             client_ps.set_base_port(self.client_base as i32);
-            req.set_client_ports(RepeatedField::from_vec(vec![client_ps]));
+            req.client_ports = vec![client_ps];
         }
     }
 }
@@ -53,7 +53,7 @@ mod tests {
         let mut request = RequestJoinGame::new();
         let port_config = PortConfig::new().expect("Could not create port config");
         port_config.apply_proto(&mut request, false);
-        assert!(request.has_server_ports());
+        assert!(request.server_ports.is_some());
         assert!(request.has_shared_port());
     }
 }

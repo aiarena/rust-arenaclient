@@ -330,7 +330,7 @@ impl Controller {
                     }
                     Ok(ref m) if m.has_join_game() => {
                         info!("Game join");
-                        PlaylistAction::JoinGame(m.get_join_game().clone())
+                        PlaylistAction::JoinGame(m.join_game().clone())
                     }
                     Ok(other) => {
                         error!("Unsupported message in playlist {:?}", other);
