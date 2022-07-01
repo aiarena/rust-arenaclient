@@ -3,6 +3,7 @@ use crate::proxy;
 #[cfg(not(feature = "no-pyo3"))]
 use bincode::{deserialize, serialize};
 use crossbeam::channel::{self, TryRecvError};
+use futures_util::StreamExt;
 use log::info;
 #[cfg(not(feature = "no-pyo3"))]
 use pyo3::prelude::*;
@@ -12,15 +13,14 @@ use pyo3::types::{PyBytes, PyTuple};
 use pyo3::ToPyObject;
 #[cfg(not(feature = "no-pyo3"))]
 use serde::{Deserialize, Serialize};
-use std::thread;
-use std::thread::JoinHandle;
+use tokio::runtime::Runtime;
 
 pub enum ClientType {
     Bot,
     Controller,
 }
 
-#[cfg_attr(not(feature = "no-pyo3"), derive(Serialize, Deserialize))]
+#[cfg_attr(not(feature = "no-pyo3"), derive(Serialize, Deserialize, Clone))]
 pub struct RustServer {
     ip_addr: String,
 }
@@ -32,59 +32,61 @@ impl RustServer {
         }
     }
 
-    pub fn run(&self) -> JoinHandle<()> {
+    pub fn run(&self) -> tokio::task::JoinHandle<()> {
         let (proxy_sender, proxy_receiver) = channel::unbounded();
         let (sup_send, sup_recv) = channel::unbounded();
         let addr = self.ip_addr.clone();
-        thread::spawn(move || {
-            proxy::run(&addr, proxy_sender);
+        tokio::spawn(async move {
+            proxy::run(&addr, proxy_sender).await;
         });
         let mut controller = Controller::new();
-        thread::spawn(move || loop {
-            match proxy_receiver.try_recv() {
-                Ok((c_type, client)) => match c_type {
-                    ClientType::Bot => {
-                        if !controller.has_supervisor() {
-                            info!("No supervisor - Client shutdown");
-                            client.shutdown().expect("Could not close connection");
-                        } else {
-                            controller.add_client(client);
-                            controller.send_message("{\"Bot\": \"Connected\"}")
+        tokio::spawn(async move {
+            loop {
+                match proxy_receiver.try_recv() {
+                    Ok((c_type, mut client)) => match c_type {
+                        ClientType::Bot => {
+                            if !controller.has_supervisor() {
+                                info!("No supervisor - Client shutdown");
+                                client.shutdown().await.expect("Could not close connection");
+                            } else {
+                                controller.add_client(client);
+                                controller.send_message("{\"Bot\": \"Connected\"}").await
+                            }
                         }
-                    }
-                    ClientType::Controller => {
-                        let client_split = client.split().unwrap();
-                        controller.add_supervisor(client_split.1, sup_recv.to_owned());
-                        create_supervisor_listener(client_split.0, sup_send.to_owned());
-                        controller.send_message("{\"Status\": \"Connected\"}");
-                    }
-                },
-                Err(TryRecvError::Empty) => {}
-                Err(TryRecvError::Disconnected) => break,
-            }
-            if let Some(action) = controller.recv_msg() {
-                match action {
-                    SupervisorAction::Quit => {
-                        info!("Quit request received");
-                        controller.close();
-                        controller.send_message("Reset");
-                        controller.drop_supervisor();
-                    }
-                    SupervisorAction::Config(config) => {
-                        controller.set_config(config);
-                        controller.send_message("{\"Config\": \"Received\"}");
-                    }
-                    SupervisorAction::ForceQuit => break,
-                    SupervisorAction::Ping => {
-                        controller.send_pong();
-                    }
-                    _ => {}
+                        ClientType::Controller => {
+                            let (ws_sender, ws_receiver) = client.stream.split();
+                            controller.add_supervisor(ws_sender, sup_recv.to_owned());
+                            create_supervisor_listener(ws_receiver, sup_send.to_owned()).await;
+                            controller.send_message("{\"Status\": \"Connected\"}").await;
+                        }
+                    },
+                    Err(TryRecvError::Empty) => {}
+                    Err(TryRecvError::Disconnected) => break,
                 }
-            }
+                if let Some(action) = controller.recv_msg() {
+                    match action {
+                        SupervisorAction::Quit => {
+                            info!("Quit request received");
+                            controller.close().await;
+                            controller.send_message("Reset").await;
+                            controller.drop_supervisor().await;
+                        }
+                        SupervisorAction::Config(config) => {
+                            controller.set_config(config);
+                            controller.send_message("{\"Config\": \"Received\"}").await;
+                        }
+                        SupervisorAction::ForceQuit => break,
+                        SupervisorAction::Ping => {
+                            controller.send_pong().await;
+                        }
+                        _ => {}
+                    }
+                }
 
-            controller.update_clients();
-            controller.update_games();
-            thread::sleep(::std::time::Duration::from_millis(100));
+                controller.update_clients().await;
+                controller.update_games().await;
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
         })
     }
 }
@@ -120,12 +122,15 @@ impl PServer {
         match &self.server {
             Some(server) => py.allow_threads(move || {
                 info!("Starting server on {:?}", server.ip_addr);
-                match server.run().join() {
-                    Ok(_) => Ok(()),
-                    Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
-                        "Could not start server. Address in use {:?}",
-                    )),
-                }
+                let rt = Runtime::new().unwrap();
+                rt.block_on(async move {
+                    match server.run().await {
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
+                            "Could not start server. Address in use {:?}",
+                        )),
+                    }
+                })
             }),
             None => Err(pyo3::exceptions::PyAssertionError::new_err(
                 "Server not set. Did you initialize the object?",

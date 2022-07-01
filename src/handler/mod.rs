@@ -8,7 +8,7 @@ pub mod player;
 
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
 use std::any::Any;
-use std::thread;
+use tokio::runtime::Runtime;
 
 use self::player::Player;
 
@@ -26,7 +26,7 @@ fn any_panic_to_string(panic_msg: Box<dyn Any>) -> String {
 /// Game thread handle
 pub struct Handle {
     /// Handle for the handler thread
-    handle: thread::JoinHandle<Vec<Player>>,
+    handle: std::thread::JoinHandle<Vec<Player>>,
     /// Result connection receiver
     result_rx: Receiver<GameResult>,
     /// Message connection sender
@@ -62,7 +62,7 @@ impl Handle {
     /// Read result after the handler is over, and clean up the handler
     /// Also returns the handler result and a list of non-disconnected players
     /// Panics if handler is still running, i.e. `update` hasn't returned true yet
-    pub fn collect_result(self) -> Result<(GameResult, Vec<Player>), String> {
+    pub async fn collect_result(self) -> Result<(GameResult, Vec<Player>), String> {
         if let Some(r) = self.result {
             match r {
                 Ok(result) => {
@@ -84,12 +84,15 @@ impl Handle {
 }
 
 /// Run handler in a thread, returning handle
-pub fn spawn(game: Game) -> Handle {
+pub fn spawn_game(game: Game) -> Handle {
     let (result_tx, result_rx) = channel::unbounded::<GameResult>();
     let (fr_msg_tx, fr_msg_rx) = channel::unbounded::<FromSupervisor>();
     let (to_msg_tx, to_msg_rx) = channel::unbounded::<ToSupervisor>();
 
-    let handle = thread::spawn(move || game.run(result_tx, fr_msg_rx, to_msg_tx));
+    let handle = std::thread::spawn(move || {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move { game.run(result_tx, fr_msg_rx, to_msg_tx).await })
+    });
 
     Handle {
         handle,

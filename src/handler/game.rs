@@ -4,7 +4,6 @@ use crate::config::Config;
 use crate::sc2::PlayerResult;
 use crossbeam::channel::{select, Receiver, Sender};
 use log::{debug, info};
-use std::thread;
 
 use super::any_panic_to_string;
 use super::messaging::{create_channels, FromSupervisor, ToGame, ToGameContent, ToSupervisor};
@@ -91,13 +90,13 @@ impl Game {
 
     /// Run the handler, spawns thread for each participant player
     /// Returns the non-disconnected player instances, so they can be returned to the playlist
-    pub fn run(
+    pub async fn run(
         self,
         result_tx: Sender<GameResult>,
         from_sv: Receiver<FromSupervisor>,
         _to_sv: Sender<ToSupervisor>,
     ) -> Vec<Player> {
-        let mut handles: Vec<thread::JoinHandle<Option<Player>>> = Vec::new();
+        let mut handles: Vec<tokio::task::JoinHandle<Option<Player>>> = Vec::new();
         let mut game_loops = 0_u32;
         let mut frame_times: [f32; 2] = [0_f32, 0_f32];
         let mut tags: [Vec<String>; 2] = [vec![], vec![]];
@@ -107,8 +106,7 @@ impl Game {
         // Run games
         for (p, c) in self.players.into_iter().zip(player_channels) {
             let thread_config: Config = self.config.clone();
-            let handle = thread::spawn(move || p.run(thread_config, c));
-            handles.push(handle);
+            handles.push(tokio::spawn(async move { p.run(thread_config, c).await }));
         }
 
         while player_results.contains(&None) {
@@ -142,14 +140,11 @@ impl Game {
         }
 
         info!("Game ready, results collected");
-        // for mut c in _to_player_channels {
-        //     c.send(ToPlayer::Quit);
-        // }
 
         // Wait until the games are ready
         let mut result_players: Vec<Player> = Vec::new();
         for handle in handles {
-            match handle.join() {
+            match handle.await {
                 Ok(Some(player)) => {
                     result_players.push(player);
                 }
@@ -157,7 +152,7 @@ impl Game {
                 Err(panic_msg) => {
                     panic!(
                         "Could not join handler-client thread: {:?}",
-                        any_panic_to_string(panic_msg)
+                        any_panic_to_string(panic_msg.into_panic())
                     );
                 }
             }
