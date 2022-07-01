@@ -89,13 +89,10 @@ pub fn spawn_game(game: Game) -> Handle {
     let (fr_msg_tx, fr_msg_rx) = channel::unbounded::<FromSupervisor>();
     let (to_msg_tx, to_msg_rx) = channel::unbounded::<ToSupervisor>();
 
-    let handle = std::thread::spawn(
-         move || {
-            let rt = Runtime::new().unwrap();
-            rt.block_on(async move {
-                game.run(result_tx, fr_msg_rx, to_msg_tx).await
-            })
-        });
+    let handle = std::thread::spawn(move || {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async move { game.run(result_tx, fr_msg_rx, to_msg_tx).await })
+    });
 
     Handle {
         handle,

@@ -1,6 +1,6 @@
 //! Bot player participant
 use log::{debug, error, info, trace, warn};
-use std::{fmt};
+use std::fmt;
 use std::time::{Duration, Instant};
 
 use protobuf::Clear;
@@ -15,15 +15,15 @@ use crate::handler::messaging::GameOver;
 use crate::proxy::Client;
 use crate::sc2::{PlayerResult, Race};
 use crate::sc2process::Process;
+use futures_util::{SinkExt, StreamExt};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
 use std::io::Write;
-use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Error;
+use tokio_tungstenite::WebSocketStream;
 
 /// Player process, connection and details
 pub struct Player {
@@ -46,30 +46,29 @@ pub struct Player {
     /// Tags
     pub tags: HashSet<String>,
     response: Response,
-    request: Request
+    request: Request,
 }
 
 impl Player {
     /// Creates new player instance and initializes sc2 process for it
     pub async fn new(connection: Client, data: PlayerData) -> tokio::task::JoinHandle<Player> {
-        tokio::task::spawn(
-            async {
-                let process = Process::new();
-                let sc2_ws = process.connect().await.expect("Could not connect");
-                Self {
-                    process,
-                    sc2_ws,
-                    sc2_status: None,
-                    game_loops: 0,
-                    data,
-                    frame_time: 0_f32,
-                    player_id: None,
-                    tags: Default::default(),
-                    response: Default::default(),
-                    client_ws: connection,
-                    request: Default::default()
-                }
-            })
+        tokio::task::spawn(async {
+            let process = Process::new();
+            let sc2_ws = process.connect().await.expect("Could not connect");
+            Self {
+                process,
+                sc2_ws,
+                sc2_status: None,
+                game_loops: 0,
+                data,
+                frame_time: 0_f32,
+                player_id: None,
+                tags: Default::default(),
+                response: Default::default(),
+                client_ws: connection,
+                request: Default::default(),
+            }
+        })
     }
     pub async fn new_no_thread(connection: Client, data: PlayerData) -> Self {
         let process = Process::new();
@@ -85,7 +84,7 @@ impl Player {
             player_id: None,
             tags: Default::default(),
             response: Default::default(),
-            request: Default::default()
+            request: Default::default(),
         }
     }
     pub fn player_name(&self) -> &Option<String> {
@@ -94,22 +93,29 @@ impl Player {
     /// Send message to the client
     async fn client_send(&mut self, msg: TMessage) {
         trace!("{:?}: Sending message to client", self.player_id);
-        self.client_ws.send_message(msg).await.expect("Could not send");
+        self.client_ws
+            .send_message(msg)
+            .await
+            .expect("Could not send");
     }
 
     /// Send a protobuf response to the client
     pub async fn client_respond(&mut self, r: &Response) {
-        trace!("{:?}:
-            Response to client: [{}]",self.player_id,
+        trace!(
+            "{:?}:
+            Response to client: [{}]",
+            self.player_id,
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
         self.client_send(TMessage::binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
-        )).await;
+        ))
+        .await;
     }
     pub async fn client_respond_raw(&mut self, r: &[u8]) {
         trace!(
-            "{:?}: Response to client: [{}]", self.player_id,
+            "{:?}: Response to client: [{}]",
+            self.player_id,
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
         self.client_send(TMessage::binary(r)).await;
@@ -118,11 +124,18 @@ impl Player {
     /// Receive a message from the client
     /// Returns None if the connection is already closed
     async fn client_recv(&mut self) -> anyhow::Result<TMessage> {
-        trace!("{:?}: Waiting for a message from the client",self.player_id);
-        if let Some(res_msg) = self.client_ws.recv_message().await{
-            match res_msg{
+        trace!(
+            "{:?}: Waiting for a message from the client",
+            self.player_id
+        );
+        if let Some(res_msg) = self.client_ws.recv_message().await {
+            match res_msg {
                 Ok(msg) => {
-                    trace!("{:?}: Message received from client:\n{:?}", self.player_id, &msg);
+                    trace!(
+                        "{:?}: Message received from client:\n{:?}",
+                        self.player_id,
+                        &msg
+                    );
                     return Ok(msg);
                 }
                 Err(Error::Io(e)) if e.kind() == ConnectionReset => {
@@ -153,8 +166,13 @@ impl Player {
                 );
                     return Err(anyhow::Error::new(e));
                 }
-                Err(err) => panic!("Could not receive: Address:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
-                                   self.client_ws.peer_addr(), self.player_id, self.data.name, &err)
+                Err(err) => panic!(
+                    "Could not receive: Address:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                    self.client_ws.peer_addr(),
+                    self.player_id,
+                    self.data.name,
+                    &err
+                ),
             }
         }
         Err(anyhow::Error::msg("Message is None"))
@@ -166,10 +184,14 @@ impl Player {
         match self.client_recv().await? {
             TMessage::Binary(bytes) => {
                 let resp = Message::parse_from_bytes(&bytes).expect("Invalid protobuf message");
-                trace!("{:?} Message from client parsed:\n{:?}", self.player_id, &resp);
+                trace!(
+                    "{:?} Message from client parsed:\n{:?}",
+                    self.player_id,
+                    &resp
+                );
                 Ok(resp)
             }
-            TMessage::Close(e) => Err(anyhow::Error::msg(format!("{:?}",e))),
+            TMessage::Close(e) => Err(anyhow::Error::msg(format!("{:?}", e))),
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
@@ -193,7 +215,8 @@ impl Player {
     pub async fn sc2_request(&mut self, r: &Request) -> Option<()> {
         self.sc2_send(TMessage::binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
-        )).await
+        ))
+        .await
     }
     pub async fn sc2_request_raw(&mut self, r: Vec<u8>) -> Option<()> {
         self.sc2_send(TMessage::binary(r)).await
@@ -206,9 +229,7 @@ impl Player {
             TMessage::Binary(bytes) => {
                 Some(Message::parse_from_bytes(&bytes).expect("Invalid data"))
             }
-            TMessage::Close(_) => {
-                None
-            }
+            TMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
@@ -245,20 +266,23 @@ impl Player {
                         buffer
                             .write_all(data)
                             .expect("Could not write to replay file");
-                        info!("{:?}: Replay saved to {:?}", self.player_id,&path);
+                        info!("{:?}: Replay saved to {:?}", self.player_id, &path);
                         true
                     }
                     Err(e) => {
-                        error!("{:?}:Failed to create replay file {:?}: {:?}", self.player_id,&path, e);
+                        error!(
+                            "{:?}:Failed to create replay file {:?}: {:?}",
+                            self.player_id, &path, e
+                        );
                         false
                     }
                 }
             } else {
-                error!("{:?}:No replay data available",self.player_id);
+                error!("{:?}:No replay data available", self.player_id);
                 false
             }
         } else {
-            error!("{:?}:Could not save replay",self.player_id);
+            error!("{:?}:Could not save replay", self.player_id);
             false
         }
     }
@@ -275,7 +299,7 @@ impl Player {
         let mut start_time: Instant = Instant::now();
         let mut surrender = false;
         let mut response_raw: Vec<u8>;
-        
+
         // Get request
         while let Ok(Ok(req_raw)) = timeout(timeout_secs, self.client_get_request_raw()).await {
             self.request.merge_from_bytes(&req_raw).ok()?;
@@ -291,7 +315,8 @@ impl Player {
                 surrender = true;
                 break;
             }
-            for tag in self.request
+            for tag in self
+                .request
                 .get_action()
                 .actions
                 .iter()
@@ -310,13 +335,14 @@ impl Player {
 
             // Send request to SC2 and get response
             response_raw = match self.sc2_query_raw(req_raw).await {
-                Some(d) => {
-                    d
-                }
+                Some(d) => d,
                 None => {
-                    error!("{:?}: SC2 unexpectedly closed the connection",self.player_id);
+                    error!(
+                        "{:?}: SC2 unexpectedly closed the connection",
+                        self.player_id
+                    );
                     gamec.send(ToGameContent::SC2UnexpectedConnectionClose);
-                    debug!("{:?}: Killing the process",self.player_id);
+                    debug!("{:?}: Killing the process", self.player_id);
                     self.process.kill();
                     return Some(self);
                 }
@@ -345,9 +371,9 @@ impl Player {
                 } else {
                     self.frame_time
                 };
-                debug!("{:?}: SC2 is shutting down",self.player_id);
+                debug!("{:?}: SC2 is shutting down", self.player_id);
                 gamec.send(ToGameContent::QuitBeforeLeave);
-                debug!("{:?}: Waiting for the process",self.player_id);
+                debug!("{:?}: Waiting for the process", self.player_id);
                 self.process.wait();
                 return Some(self);
             } else if self.response.has_observation() {
@@ -386,7 +412,7 @@ impl Player {
                     } else {
                         self.frame_time
                     };
-                    debug!("{:?}: Max time reached",self.player_id);
+                    debug!("{:?}: Max time reached", self.player_id);
                     gamec.send(ToGameContent::GameOver(GameOver {
                         results: vec![PlayerResult::Tie, PlayerResult::Tie],
                         game_loops: self.game_loops,
@@ -403,7 +429,6 @@ impl Player {
             clear_request(&mut self.request);
             clear_response(&mut self.response);
             response_raw.clear();
-
         }
         if surrender {
             let mut results: Vec<PlayerResult> = vec![PlayerResult::Victory; 2];
@@ -418,11 +443,13 @@ impl Player {
             return Some(self);
         }
         gamec.send(ToGameContent::UnexpectedConnectionClose);
-        info!("{:?}: Killing process after unexpected connection close (Crash or Timeout)", self.player_id);
+        info!(
+            "{:?}: Killing process after unexpected connection close (Crash or Timeout)",
+            self.player_id
+        );
         self.process.kill();
         Some(self)
     }
-
 }
 
 impl fmt::Debug for Player {

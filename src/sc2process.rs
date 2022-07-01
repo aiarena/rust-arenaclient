@@ -10,9 +10,9 @@ use log::{debug, info, warn};
 
 use portpicker::pick_unused_port;
 use tempfile::TempDir;
-use tokio::net::{ TcpStream};
-use tokio_tungstenite::{ WebSocketStream};
+use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use tokio_tungstenite::WebSocketStream;
 
 use crate::paths;
 
@@ -46,8 +46,8 @@ impl Process {
             .arg("-tempDir")
             .arg(tempdir.path().to_str().unwrap())
             .current_dir(paths::cwd_dir()))
-            .spawn()
-            .expect("Could not launch SC2 process");
+        .spawn()
+        .expect("Could not launch SC2 process");
 
         Self { process, ws_port }
     }
@@ -61,29 +61,31 @@ impl Process {
 
         for _ in 0..60 {
             sleep(Duration::new(1, 0));
-            let socket = match tokio::time::timeout(
-                Duration::from_secs(120),
-                TcpStream::connect(&addr),
-            ).await.ok()? {
-                Ok(e) => { e }
-                Err(ref e) if e.kind() == ConnectionRefused => {
-                    continue;
-                }
-                Err(e) => panic!("E: {:?}", e),
-            };//todo: could get a panic here on a timeout. Check it
-
+            let socket =
+                match tokio::time::timeout(Duration::from_secs(120), TcpStream::connect(&addr))
+                    .await
+                    .ok()?
+                {
+                    Ok(e) => e,
+                    Err(ref e) if e.kind() == ConnectionRefused => {
+                        continue;
+                    }
+                    Err(e) => panic!("E: {:?}", e),
+                };
 
             let config = Some(WebSocketConfig {
                 max_send_queue: None,
                 max_message_size: Some(128 << 20), // 128MiB
-                max_frame_size: Some(32 << 20), // 32MiB
+                max_frame_size: Some(32 << 20),    // 32MiB
                 // This setting allows to accept client frames which are not masked
                 // This is not in compliance with RFC 6455 but might be handy in some
                 // rare cases where it is necessary to integrate with existing/legacy
                 // clients which are sending unmasked frames
                 accept_unmasked_frames: true,
             });
-            let (ws_stream, _) = tokio_tungstenite::client_async_with_config(url, socket, config).await.expect("Failed to connect");
+            let (ws_stream, _) = tokio_tungstenite::client_async_with_config(url, socket, config)
+                .await
+                .expect("Failed to connect");
 
             return Some(ws_stream);
         }

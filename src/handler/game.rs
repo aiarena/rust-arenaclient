@@ -106,9 +106,7 @@ impl Game {
         // Run games
         for (p, c) in self.players.into_iter().zip(player_channels) {
             let thread_config: Config = self.config.clone();
-            handles.push(tokio::spawn(async move {
-                p.run(thread_config, c).await
-            }));
+            handles.push(tokio::spawn(async move { p.run(thread_config, c).await }));
         }
 
         while player_results.contains(&None) {

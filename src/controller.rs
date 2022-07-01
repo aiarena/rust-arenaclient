@@ -5,24 +5,21 @@
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
 
-
 use crate::build_info::BuildInfo;
 use crate::config::Config;
-use crate::handler::{
-    spawn_game, FromSupervisor, GameLobby, Handle as GameHandle, PlayerNum,
-};
+use crate::handler::{spawn_game, FromSupervisor, GameLobby, Handle as GameHandle, PlayerNum};
 use crate::proxy::Client;
 use crate::result::JsonResult;
 use crate::sc2::Race;
 use crossbeam::channel::{Receiver, Sender};
+use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::{SinkExt, StreamExt};
 use protobuf::Message;
-use tokio_tungstenite::tungstenite::Message as TMessage;
-use tokio_tungstenite::tungstenite::error::Error;
 use sc2_proto::{self, sc2api::RequestJoinGame};
 use std::collections::HashMap;
-use futures_util::{SinkExt, StreamExt};
-use futures_util::stream::{SplitSink, SplitStream};
 use tokio::net::TcpStream;
+use tokio_tungstenite::tungstenite::error::Error;
+use tokio_tungstenite::tungstenite::Message as TMessage;
 use tokio_tungstenite::WebSocketStream;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +129,8 @@ impl Controller {
         match &mut self.supervisor {
             Some(sender) => {
                 sender
-                    .send(TMessage::text(message)).await
+                    .send(TMessage::text(message))
+                    .await
                     .expect("Could not send message to supervisor");
             }
             None => {
@@ -194,7 +192,11 @@ impl Controller {
     }
 
     /// Add a new supervisor client socket
-    pub fn add_supervisor(&mut self, client: SplitSink<WebSocketStream<TcpStream>, TMessage>, recv: Receiver<SupervisorAction>) {
+    pub fn add_supervisor(
+        &mut self,
+        client: SplitSink<WebSocketStream<TcpStream>, TMessage>,
+        recv: Receiver<SupervisorAction>,
+    ) {
         if self.supervisor.is_some() {
             error!("Supervisor already set - Resetting supervisor");
         }
@@ -227,10 +229,7 @@ impl Controller {
     /// Remove client from playlist, closing the connection
     async fn drop_client(&mut self, index: usize) {
         let (_, client, _) = &mut self.clients[index];
-        debug!(
-            "Removing client {:?} from playlist",
-            client.peer_addr()
-        );
+        debug!("Removing client {:?} from playlist", client.peer_addr());
         client.shutdown().await.expect("Connection shutdown failed");
         self.clients.remove(index);
     }
@@ -239,7 +238,9 @@ impl Controller {
     pub async fn drop_supervisor(&mut self) {
         match &mut self.supervisor {
             Some(client) => {
-                client.close().await
+                client
+                    .close()
+                    .await
                     .expect("Supervisor connection shutdown failed");
                 self.supervisor = None;
             }
@@ -269,26 +270,30 @@ impl Controller {
         if self.lobby.is_some() {
             trace!("Lobby exists");
             let mut lobby = self.lobby.take().unwrap();
-            lobby.join(
-                client,
-                req,
-                (client_name, client_race),
-                self.light_mode,
-                player,
-            ).await;
+            lobby
+                .join(
+                    client,
+                    req,
+                    (client_name, client_race),
+                    self.light_mode,
+                    player,
+                )
+                .await;
             lobby.join_player_handles().await;
             let game = lobby.start().await?;
             self.game = Some(spawn_game(game));
         } else if self.create_lobby() {
             trace!("Create new lobby");
             let lobby = self.lobby.as_mut().unwrap();
-            lobby.join(
-                client,
-                req,
-                (client_name, client_race),
-                self.light_mode,
-                player,
-            ).await;
+            lobby
+                .join(
+                    client,
+                    req,
+                    (client_name, client_race),
+                    self.light_mode,
+                    player,
+                )
+                .await;
         } else {
             error!("Could not create lobby");
         }
@@ -356,14 +361,18 @@ impl Controller {
                     PlaylistAction::Respond(resp) => {
                         debug!("Respond to {:?}", self.clients[i].0);
                         self.clients[i]
-                            .1.stream
-                            .send(resp).await
+                            .1
+                            .stream
+                            .send(resp)
+                            .await
                             .expect("Could not respond");
                     }
                     PlaylistAction::RespondQuit(resp) => {
                         self.clients[i]
-                            .1.stream
-                            .send(resp).await
+                            .1
+                            .stream
+                            .send(resp)
+                            .await
                             .expect("Could not respond");
                         debug!("RespondQuit");
                         self.drop_client(i).await;

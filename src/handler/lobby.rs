@@ -59,17 +59,26 @@ impl GameLobby {
             pd.race = client_data.1.unwrap();
         }
         pd.name = Some(client_data.0);
-        trace!("Player {:?} with peer addr {:?} is player {:?}",&pd.name,connection.peer_addr(), player);
+        trace!(
+            "Player {:?} with peer addr {:?} is player {:?}",
+            &pd.name,
+            connection.peer_addr(),
+            player
+        );
         if must_join {
             match player {
                 PlayerNum::One => self
                     .players
                     .insert(0, Player::new_no_thread(connection, pd).await),
-                PlayerNum::Two => self.players.push(Player::new_no_thread(connection, pd).await),
+                PlayerNum::Two => self
+                    .players
+                    .push(Player::new_no_thread(connection, pd).await),
             }
         } else {
             match player {
-                PlayerNum::One => self.player_handles.insert(0, Player::new(connection, pd).await),
+                PlayerNum::One => self
+                    .player_handles
+                    .insert(0, Player::new(connection, pd).await),
                 PlayerNum::Two => self.player_handles.push(Player::new(connection, pd).await),
             }
         }
@@ -172,7 +181,11 @@ impl GameLobby {
             }
 
             // No error, pass through the response
-            trace!("Sending response to client number {:?}\n\n\n{:?}", player.player_id, &response);
+            trace!(
+                "Sending response to client number {:?}\n\n\n{:?}",
+                player.player_id,
+                &response
+            );
             player.client_respond(&response).await;
         }
 

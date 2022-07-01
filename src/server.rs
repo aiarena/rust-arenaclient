@@ -3,6 +3,7 @@ use crate::proxy;
 #[cfg(not(feature = "no-pyo3"))]
 use bincode::{deserialize, serialize};
 use crossbeam::channel::{self, TryRecvError};
+use futures_util::StreamExt;
 use log::info;
 #[cfg(not(feature = "no-pyo3"))]
 use pyo3::prelude::*;
@@ -12,7 +13,6 @@ use pyo3::types::{PyBytes, PyTuple};
 use pyo3::ToPyObject;
 #[cfg(not(feature = "no-pyo3"))]
 use serde::{Deserialize, Serialize};
-use futures_util::{ StreamExt};
 use tokio::runtime::Runtime;
 
 pub enum ClientType {
@@ -125,11 +125,11 @@ impl PServer {
                 let rt = Runtime::new().unwrap();
                 rt.block_on(async move {
                     match server.run().await {
-                                            Ok(_) => Ok(()),
-                                            Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
-                                                "Could not start server. Address in use {:?}",
-                                            )),
-                                        }
+                        Ok(_) => Ok(()),
+                        Err(_) => Err(pyo3::exceptions::PyConnectionError::new_err(
+                            "Could not start server. Address in use {:?}",
+                        )),
+                    }
                 })
             }),
             None => Err(pyo3::exceptions::PyAssertionError::new_err(
@@ -202,4 +202,3 @@ mod tests {
     //     assert!(c.is_ok());
     // }
 }
-

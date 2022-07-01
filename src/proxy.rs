@@ -1,24 +1,30 @@
 //! Proxy WebSocket receiver
 
-use std::net::SocketAddr;
-use crossbeam::channel::Sender;
-use futures_util::{ StreamExt};
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use crate::server::ClientType;
+use crossbeam::channel::Sender;
+use futures_util::SinkExt;
+use futures_util::StreamExt;
 use log::info;
-use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse, Request, Response};
-use tokio_tungstenite::tungstenite::{Error, Message};
-use tokio_tungstenite::tungstenite::protocol::{CloseFrame, WebSocketConfig};
+use std::net::SocketAddr;
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio_tungstenite::tungstenite::handshake::server::{
+    Callback, ErrorResponse, Request, Response,
+};
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
+use tokio_tungstenite::tungstenite::protocol::{CloseFrame, WebSocketConfig};
+use tokio_tungstenite::tungstenite::{Error, Message};
 use tokio_tungstenite::{accept_hdr_async_with_config, WebSocketStream};
-use futures_util::{SinkExt};
 
 pub struct HeaderHandler {
     is_supervisor: bool,
 }
 
 impl Callback for HeaderHandler {
-    fn on_request(mut self, request: &Request, response: Response) -> Result<Response, ErrorResponse> {
+    fn on_request(
+        mut self,
+        request: &Request,
+        response: Response,
+    ) -> Result<Response, ErrorResponse> {
         self.is_supervisor = request.headers().contains_key("supervisor");
         Ok(response)
     }
@@ -31,7 +37,12 @@ pub struct Client {
 
 impl Client {
     pub async fn shutdown(&mut self) -> Result<(), Error> {
-        self.stream.close(Some(CloseFrame { code: CloseCode::Normal, reason: Default::default() })).await
+        self.stream
+            .close(Some(CloseFrame {
+                code: CloseCode::Normal,
+                reason: Default::default(),
+            }))
+            .await
     }
     pub async fn send_message(&mut self, message: Message) -> Result<(), Error> {
         self.stream.send(message).await
@@ -56,7 +67,7 @@ async fn get_connection(server: &mut TcpListener) -> Option<(ClientType, Client)
     let config = Some(WebSocketConfig {
         max_send_queue: None,
         max_message_size: Some(128 << 20), // 128MiB
-        max_frame_size: Some(32 << 20), // 32MiB
+        max_frame_size: Some(32 << 20),    // 32MiB
         // This setting allows to accept client frames which are not masked
         // This is not in compliance with RFC 6455 but might be handy in some
         // rare cases where it is necessary to integrate with existing/legacy
@@ -75,11 +86,11 @@ async fn get_connection(server: &mut TcpListener) -> Option<(ClientType, Client)
                     Some((ClientType::Controller, client))
                 } else {
                     Some((ClientType::Bot, client))
-                }
+                };
             }
             None
         }
-        _ => None
+        _ => None,
     }
 }
 
