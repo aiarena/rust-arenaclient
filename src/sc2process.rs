@@ -10,9 +10,9 @@ use log::{debug, info, warn};
 
 use portpicker::pick_unused_port;
 use tempfile::TempDir;
-use websocket::client::sync::Client;
-use websocket::stream::sync::TcpStream;
-use websocket::ClientBuilder;
+use tokio::net::{ TcpStream};
+use tokio_tungstenite::{ WebSocketStream};
+use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::paths;
 
@@ -23,6 +23,7 @@ pub struct Process {
     /// WebSocket port
     ws_port: u16,
 }
+
 impl Process {
     /// Launch a new process
     pub fn new() -> Self {
@@ -45,14 +46,14 @@ impl Process {
             .arg("-tempDir")
             .arg(tempdir.path().to_str().unwrap())
             .current_dir(paths::cwd_dir()))
-        .spawn()
-        .expect("Could not launch SC2 process");
+            .spawn()
+            .expect("Could not launch SC2 process");
 
         Self { process, ws_port }
     }
 
     /// Connect the process websocket
-    pub fn connect(&self) -> Option<Client<std::net::TcpStream>> {
+    pub async fn connect(&self) -> Option<WebSocketStream<TcpStream>> {
         let url = format!("ws://127.0.0.1:{}/sc2api", self.ws_port);
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), self.ws_port);
 
@@ -60,22 +61,31 @@ impl Process {
 
         for _ in 0..60 {
             sleep(Duration::new(1, 0));
-
-            let tcp_stream = match TcpStream::connect_timeout(&addr, Duration::new(120, 0)) {
-                Ok(s) => s,
+            let socket = match tokio::time::timeout(
+                Duration::from_secs(120),
+                TcpStream::connect(&addr),
+            ).await.ok()? {
+                Ok(e) => { e }
                 Err(ref e) if e.kind() == ConnectionRefused => {
                     continue;
                 }
                 Err(e) => panic!("E: {:?}", e),
-            };
+            };//todo: could get a panic here on a timeout. Check it
 
-            match ClientBuilder::new(&url).unwrap().connect_on(tcp_stream) {
-                Ok(client) => {
-                    debug!("Connection created");
-                    return Some(client);
-                }
-                Err(error) => panic!("Could not connect: {:#?}", error),
-            }
+
+            let config = Some(WebSocketConfig {
+                max_send_queue: None,
+                max_message_size: Some(128 << 20), // 128MiB
+                max_frame_size: Some(32 << 20), // 32MiB
+                // This setting allows to accept client frames which are not masked
+                // This is not in compliance with RFC 6455 but might be handy in some
+                // rare cases where it is necessary to integrate with existing/legacy
+                // clients which are sending unmasked frames
+                accept_unmasked_frames: true,
+            });
+            let (ws_stream, _) = tokio_tungstenite::client_async_with_config(url, socket, config).await.expect("Failed to connect");
+
+            return Some(ws_stream);
         }
 
         warn!("Websocket connection could not be formed");

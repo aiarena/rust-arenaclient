@@ -4,10 +4,7 @@
 
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, WouldBlock};
 
-use websocket::message::{Message as ws_Message, OwnedMessage};
-use websocket::result::WebSocketError;
 
 use crate::build_info::BuildInfo;
 use crate::config::Config;
@@ -19,12 +16,13 @@ use crate::result::JsonResult;
 use crate::sc2::Race;
 use crossbeam::channel::{Receiver, Sender};
 use protobuf::Message;
+use tokio_tungstenite::tungstenite::Message as TMessage;
 use sc2_proto::{self, sc2api::RequestJoinGame};
 use std::collections::HashMap;
-use std::thread;
-use std::time::Duration;
-use websocket::sync::{Reader, Writer};
-use websocket::websocket_base::stream::sync::TcpStream;
+use futures_util::{SinkExt, StreamExt};
+use futures_util::stream::{SplitSink, SplitStream};
+use tokio::net::TcpStream;
+use tokio_tungstenite::WebSocketStream;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SupervisorAction {
@@ -37,18 +35,19 @@ pub enum SupervisorAction {
 }
 
 enum PlaylistAction {
-    Respond(OwnedMessage),
-    RespondQuit(OwnedMessage),
-    JoinGame(sc2_proto::sc2api::RequestJoinGame),
+    Respond(TMessage),
+    RespondQuit(TMessage),
+    JoinGame(RequestJoinGame),
     Kick,
 }
+
 impl PlaylistAction {
     pub fn respond(r: sc2_proto::sc2api::Response) -> Self {
-        let m = OwnedMessage::Binary(r.write_to_bytes().expect("Invalid protobuf message"));
+        let m = TMessage::Binary(r.write_to_bytes().expect("Invalid protobuf message"));
         PlaylistAction::Respond(m)
     }
     pub fn respond_quit(r: sc2_proto::sc2api::Response) -> Self {
-        let m = OwnedMessage::Binary(r.write_to_bytes().expect("Invalid protobuf message"));
+        let m = TMessage::Binary(r.write_to_bytes().expect("Invalid protobuf message"));
         PlaylistAction::RespondQuit(m)
     }
 }
@@ -57,6 +56,7 @@ impl PlaylistAction {
 /// Game keeps same id from lobby creation until all clients leave the handler
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GameId(u64);
+
 impl GameId {
     fn next(self) -> Self {
         Self(self.0 + 1)
@@ -71,7 +71,7 @@ pub struct Controller {
     /// If a handler join is requested is pending (with remote), then also contains that
     clients: Vec<(BotData, Client, Option<RequestJoinGame>)>,
     /// Supervisor channel writer
-    supervisor: Option<Writer<TcpStream>>,
+    supervisor: Option<SplitSink<WebSocketStream<TcpStream>, TMessage>>,
     /// Supervisor channel receiver
     super_recv: Option<Receiver<SupervisorAction>>,
     /// Game config received from supervisor
@@ -113,11 +113,12 @@ impl Controller {
         self.game = None;
         self.connected_clients = 0;
     }
-    pub fn send_pong(&mut self) {
+    pub async fn send_pong(&mut self) {
         match &mut self.supervisor {
             Some(sender) => {
                 sender
-                    .send_message(&ws_Message::pong(vec![0_u8]))
+                    .send(TMessage::Pong(vec![0_u8]))
+                    .await
                     .expect("Could not send message to supervisor");
             }
             None => {
@@ -126,11 +127,11 @@ impl Controller {
         }
     }
     /// Sends a message to the supervisor
-    pub fn send_message(&mut self, message: &str) {
+    pub async fn send_message(&mut self, message: &str) {
         match &mut self.supervisor {
             Some(sender) => {
                 sender
-                    .send_message(&ws_Message::text(message))
+                    .send(TMessage::text(message)).await
                     .expect("Could not send message to supervisor");
             }
             None => {
@@ -154,13 +155,13 @@ impl Controller {
     /// Add a new client socket to playlist
     pub fn add_client(&mut self, client: Client) {
         info!("Added client {:?}", client.peer_addr());
-        client
-            .set_nonblocking(true)
-            .expect("Could not set non-blocking");
-        client
-            .stream_ref()
-            .set_read_timeout(Some(Duration::new(35, 0)))
-            .expect("Could not set read timeout");
+        // client
+        //     .set_nonblocking(true)
+        //     .expect("Could not set non-blocking"); //todo: double check
+        // client
+        //     .stream.
+        //     .set_read_timeout(Some(Duration::new(35, 0)))
+        //     .expect("Could not set read timeout");//todo: double check
         debug_assert!(self.clients.len() < 2);
         match self.config.clone() {
             Some(config) => {
@@ -199,7 +200,7 @@ impl Controller {
     }
 
     /// Add a new supervisor client socket
-    pub fn add_supervisor(&mut self, client: Writer<TcpStream>, recv: Receiver<SupervisorAction>) {
+    pub fn add_supervisor(&mut self, client: SplitSink<WebSocketStream<TcpStream>, TMessage>, recv: Receiver<SupervisorAction>) {
         if self.supervisor.is_some() {
             error!("Supervisor already set - Resetting supervisor");
         }
@@ -230,22 +231,21 @@ impl Controller {
     }
 
     /// Remove client from playlist, closing the connection
-    fn drop_client(&mut self, index: usize) {
+    async fn drop_client(&mut self, index: usize) {
         let (_, client, _) = &mut self.clients[index];
         debug!(
             "Removing client {:?} from playlist",
-            client.peer_addr().unwrap()
+            client.peer_addr()
         );
-        client.shutdown().expect("Connection shutdown failed");
+        client.shutdown().await.expect("Connection shutdown failed");
         self.clients.remove(index);
     }
 
     /// Remove supervisor
-    pub fn drop_supervisor(&mut self) {
+    pub async fn drop_supervisor(&mut self) {
         match &mut self.supervisor {
             Some(client) => {
-                client
-                    .shutdown()
+                client.close().await
                     .expect("Supervisor connection shutdown failed");
                 self.supervisor = None;
             }
@@ -258,8 +258,7 @@ impl Controller {
 
     /// Join to handler from playlist
     /// If handler join fails, drops connection
-    #[must_use]
-    fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
+    async fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
         let ((client_name, client_race), client, old_req) = self.clients.remove(index);
         debug!("{} client_join_game", client_name);
         if old_req != None {
@@ -267,9 +266,9 @@ impl Controller {
             return None;
         }
 
-        client
-            .set_nonblocking(false)
-            .expect("Could not set non-blocking");
+        // client
+        //     .set_nonblocking(false)
+        //     .expect("Could not set non-blocking"); //todo: double check
         // TODO: Verify that InterfaceOptions are allowed
         // TODO: Fix this so it works without lobbies
         let player = match client_name.clone() {
@@ -285,9 +284,9 @@ impl Controller {
                 (client_name, client_race),
                 self.light_mode,
                 player,
-            );
-            lobby.join_player_handles();
-            let game = lobby.start()?;
+            ).await;
+            lobby.join_player_handles().await;
+            let game = lobby.start().await?;
             self.game = Some(spawn_game(game));
         } else if self.create_lobby() {
             let lobby = self.lobby.as_mut().unwrap();
@@ -297,7 +296,7 @@ impl Controller {
                 (client_name, client_race),
                 self.light_mode,
                 player,
-            );
+            ).await;
         } else {
             error!("Could not create lobby");
         }
@@ -306,9 +305,9 @@ impl Controller {
     }
 
     /// Process message from a client in the playlist
-    fn process_client_message(&mut self, msg: OwnedMessage) -> PlaylistAction {
+    fn process_client_message(&mut self, msg: TMessage) -> PlaylistAction {
         match msg {
-            OwnedMessage::Binary(bytes) => {
+            TMessage::Binary(bytes) => {
                 let req = sc2_proto::sc2api::Request::parse_from_bytes(&bytes);
                 debug!("Incoming playlist request: {:?}", req);
 
@@ -354,49 +353,52 @@ impl Controller {
     }
 
     /// Update clients in playlist to see if they join a handler or disconnect
-    pub fn update_clients(&mut self) {
+    pub async fn update_clients(&mut self) {
         for i in (0..self.clients.len()).rev() {
-            match self.clients[i].1.recv_message() {
-                Ok(msg) => match self.process_client_message(msg) {
+            match self.clients[i].1.recv_message().await {
+                Some(Ok(msg)) => match self.process_client_message(msg) {
                     PlaylistAction::Kick => {
                         debug!("Kick client");
-                        self.drop_client(i)
+                        self.drop_client(i).await
                     }
                     PlaylistAction::Respond(resp) => {
                         debug!("Respond to {:?}", self.clients[i].0);
                         self.clients[i]
-                            .1
-                            .send_message(&resp)
+                            .1.stream
+                            .send(resp).await
                             .expect("Could not respond");
                     }
                     PlaylistAction::RespondQuit(resp) => {
                         self.clients[i]
-                            .1
-                            .send_message(&resp)
+                            .1.stream
+                            .send(resp).await
                             .expect("Could not respond");
                         debug!("RespondQuit");
-                        self.drop_client(i);
+                        self.drop_client(i).await;
                     }
                     PlaylistAction::JoinGame(req) => {
                         debug!("JoinGame from {:?}", self.clients[i].0);
-                        let join_response = self.client_join_game(i, req);
+                        let join_response = self.client_join_game(i, req).await;
 
                         if join_response == None {
                             error!("Game creation / joining failed");
                         }
                     }
                 },
-                Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {}
-                Err(err) => {
+                //Err(Error::) if e.kind() == WouldBlock => {} //Todo: double check
+                None => {
+                    error!("None message");
+                }
+                Some(Err(err)) => {
                     error!("Invalid message {:?}", err);
-                    self.drop_client(i);
+                    self.drop_client(i).await;
                 }
             };
         }
     }
 
     /// Update handler handles to see if they are still running
-    pub fn update_games(&mut self) {
+    pub async fn update_games(&mut self) {
         let mut game_over = false;
         if let Some(game) = &mut self.game {
             if game.check() {
@@ -405,7 +407,7 @@ impl Controller {
         }
         if game_over {
             let game = self.game.take().unwrap();
-            match game.collect_result() {
+            match game.collect_result().await {
                 Ok((result, players)) => {
                     let mut avg_hash: HashMap<String, f32> = HashMap::with_capacity(2);
                     let mut tags_hash: HashMap<String, Vec<String>> = HashMap::with_capacity(2);
@@ -444,12 +446,12 @@ impl Controller {
                         self.config.as_ref().map(|x| x.match_id),
                         tags,
                     );
-                    self.send_message(j_result.serialize().as_ref());
+                    self.send_message(j_result.serialize().as_ref()).await;
 
                     for i in (0..self.clients.len()).rev() {
-                        self.drop_client(i)
+                        self.drop_client(i).await
                     }
-                    self.drop_supervisor();
+                    self.drop_supervisor().await;
                     self.reset();
                     // println!("Game result: {:?}", result);
                 }
@@ -519,7 +521,7 @@ impl Controller {
 
     /// Destroys the controller, ending all games,
     /// and closing all connections and threads
-    pub fn close(&mut self) {
+    pub async fn close(&mut self) {
         debug!("Closing Controller");
 
         // Tell game to quit
@@ -528,11 +530,11 @@ impl Controller {
         }
         // Destroy lobby
         if let Some(lobby) = &mut self.lobby {
-            lobby.close();
+            lobby.close().await;
         }
 
-        for (_, client, _) in &self.clients {
-            client.shutdown().expect("Could not close connection");
+        for (_, client, _) in &mut self.clients {
+            client.shutdown().await.expect("Could not close connection");
         }
         self.reset()
 
@@ -551,63 +553,64 @@ pub enum RemoteUpdateStatus {
     NoAction,
 }
 
-pub fn create_supervisor_listener(
-    mut client_recv: Reader<TcpStream>,
+pub async fn create_supervisor_listener(
+    mut client_recv: SplitStream<WebSocketStream<TcpStream>>,
     sender: Sender<SupervisorAction>,
 ) {
-    thread::spawn(move || loop {
-        let r_msg = client_recv.recv_message();
-        trace!("message received from supervisor client");
-        match r_msg {
-            Ok(msg) => match msg {
-                OwnedMessage::Text(data) => {
-                    if data == "Reset" {
-                        sender
-                            .send(SupervisorAction::Quit)
-                            .expect("Could not send SupervisorAction");
-                        break;
-                    } else if data == "Received" {
-                        sender
-                            .send(SupervisorAction::Received)
-                            .expect("Could not send SupervisorAction");
-                    } else if data.contains("Map") || data.contains("map") {
-                        sender
-                            .send(SupervisorAction::Config(data))
-                            .expect("Could not send config");
-                    } else if data == "Quit" {
-                        sender
-                            .send(SupervisorAction::ForceQuit)
-                            .expect("Could not send ForceQuit");
+    tokio::spawn(async move {
+        loop {
+            let r_msg = client_recv.next().await.unwrap();
+            trace!("Message received from supervisor client");
+            match r_msg {
+                Ok(msg) => match msg {
+                    TMessage::Text(data) => {
+                        if data == "Reset" {
+                            sender
+                                .send(SupervisorAction::Quit)
+                                .expect("Could not send SupervisorAction");
+                            break;
+                        } else if data == "Received" {
+                            sender
+                                .send(SupervisorAction::Received)
+                                .expect("Could not send SupervisorAction");
+                        } else if data.contains("Map") || data.contains("map") {
+                            sender
+                                .send(SupervisorAction::Config(data))
+                                .expect("Could not send config");
+                        } else if data == "Quit" {
+                            sender
+                                .send(SupervisorAction::ForceQuit)
+                                .expect("Could not send ForceQuit");
+                        }
                     }
-                }
-
-                OwnedMessage::Ping(_) => {
+                    TMessage::Ping(_) => {
+                        sender
+                            .send(SupervisorAction::Ping)
+                            .expect("Could not send SupervisorAction");
+                    }
+                    _ => {}
+                },
+                Err(tokio_tungstenite::tungstenite::error::Error::AlreadyClosed) => {
+                    error!("Supervisor Error::AlreadyClosed");
                     sender
-                        .send(SupervisorAction::Ping)
-                        .expect("Could not send SupervisorAction");
+                        .send(SupervisorAction::ForceQuit)
+                        .expect("Could not send ForceQuit");
+                    break;
                 }
-                _ => {}
-            },
-            Err(WebSocketError::NoDataAvailable) => {
-                break;
-            }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
-                sender
-                    .send(SupervisorAction::ForceQuit)
-                    .expect("Could not send ForceQuit");
-                break;
-            }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionReset => {
-                sender
-                    .send(SupervisorAction::ForceQuit)
-                    .expect("Could not send ForceQuit");
-                break;
-            }
-            Err(e) => {
-                sender
-                    .send(SupervisorAction::ForceQuit)
-                    .expect("Could not send ForceQuit");
-                error!("Supervisor receive error: {:?}", e)
+                Err(tokio_tungstenite::tungstenite::error::Error::Capacity(e)) => {
+                    error!("{:?}", e);
+                    sender
+                        .send(SupervisorAction::ForceQuit)
+                        .expect("Could not send ForceQuit");
+                    break;
+                }
+                Err(e) => {
+                    error!("{:?}", e);
+                    sender
+                        .send(SupervisorAction::ForceQuit)
+                        .expect("Could not send ForceQuit");
+                    break;
+                }
             }
         }
     });

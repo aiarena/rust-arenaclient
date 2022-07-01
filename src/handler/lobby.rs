@@ -1,10 +1,10 @@
 //! Game manages a single unstarted handler, including its configuration
 
 use log::{error, info};
-use std::thread::JoinHandle;
 
 use protobuf::RepeatedField;
 use sc2_proto::sc2api::RequestJoinGame;
+use std::thread::JoinHandle;
 
 use crate::maps::find_map;
 use crate::portconfig::PortConfig;
@@ -34,7 +34,7 @@ impl GameLobby {
             player_handles: Vec::new(),
         }
     }
-    pub fn join_player_handles(&mut self) {
+    pub async fn join_player_handles(&mut self) {
         while let Some(handle) = self.player_handles.pop() {
             // self.players.push(handle.join().unwrap());
             self.players.insert(0, handle.join().unwrap());
@@ -46,7 +46,7 @@ impl GameLobby {
     }
 
     /// Add a new client to the handler
-    pub fn join(
+    pub async fn join(
         &mut self,
         connection: Client,
         join_req: RequestJoinGame,
@@ -63,13 +63,13 @@ impl GameLobby {
             match player {
                 PlayerNum::One => self
                     .players
-                    .insert(0, Player::new_no_thread(connection, pd)),
-                PlayerNum::Two => self.players.push(Player::new_no_thread(connection, pd)),
+                    .insert(0, Player::new_no_thread(connection, pd).await),
+                PlayerNum::Two => self.players.push(Player::new_no_thread(connection, pd).await),
             }
         } else {
             match player {
-                PlayerNum::One => self.player_handles.insert(0, Player::new(connection, pd)),
-                PlayerNum::Two => self.player_handles.push(Player::new(connection, pd)),
+                PlayerNum::One => self.player_handles.insert(0, Player::new(connection, pd).await),
+                PlayerNum::Two => self.player_handles.push(Player::new(connection, pd).await),
             }
         }
     }
@@ -97,7 +97,7 @@ impl GameLobby {
     /// Create the handler using the first client
     /// Returns None if handler join fails (connection close or sc2 process close)
     #[must_use]
-    pub fn create_game(&mut self) -> Option<()> {
+    pub async fn create_game(&mut self) -> Option<()> {
         assert!(!self.players.is_empty());
 
         // Craft CrateGame request
@@ -109,7 +109,7 @@ impl GameLobby {
 
         // Send CreateGame request to first process
         let proto = self.proto_create_game(player_configs);
-        let response = self.players[0].sc2_query(proto)?;
+        let response = self.players[0].sc2_query(&proto).await?;
 
         assert!(response.has_create_game());
         let resp_create_game = response.get_create_game();
@@ -150,7 +150,7 @@ impl GameLobby {
     /// Joins all participants to games
     /// Returns None iff handler join fails (connection close or sc2 process close)
     #[must_use]
-    pub fn join_all_game(&mut self) -> Option<()> {
+    pub async fn join_all_game(&mut self) -> Option<()> {
         let pc = PortConfig::new().expect("Unable to find free ports");
 
         let protos: Vec<_> = self
@@ -160,11 +160,11 @@ impl GameLobby {
             .collect();
 
         for (player, proto) in self.players.iter_mut().zip(protos) {
-            player.sc2_request(proto)?;
+            player.sc2_request(&proto).await?;
         }
 
         for player in self.players.iter_mut() {
-            let response = player.sc2_recv()?;
+            let response = player.sc2_recv().await?;
             assert!(response.has_join_game());
             let resp_join_game = response.get_join_game();
             player.player_id = Some(resp_join_game.get_player_id());
@@ -176,7 +176,7 @@ impl GameLobby {
             }
 
             // No error, pass through the response
-            player.client_respond(&response);
+            player.client_respond(&response).await;
         }
 
         // TODO: Human players?
@@ -189,9 +189,9 @@ impl GameLobby {
     /// Returns None if handler create or join fails (connection close or sc2 process close)
     /// In that case, the connections are dropped (closed).
     #[must_use]
-    pub fn start(mut self) -> Option<Game> {
-        self.create_game()?;
-        self.join_all_game()?;
+    pub async fn start(mut self) -> Option<Game> {
+        self.create_game().await?;
+        self.join_all_game().await?;
         Some(Game {
             config: self.config,
             players: self.players,
@@ -199,7 +199,7 @@ impl GameLobby {
     }
 
     /// Destroy the lobby, closing all the connections
-    pub fn close(&mut self) {
+    pub async fn close(&mut self) {
         while let Some(handle) = self.player_handles.pop() {
             if let Ok(mut p) = handle.join() {
                 p.process.kill()

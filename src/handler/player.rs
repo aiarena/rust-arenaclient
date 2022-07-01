@@ -1,15 +1,12 @@
 //! Bot player participant
-use log::{debug, error, info, trace, warn};
-use std::fmt;
-use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBlock};
+use log::{debug, error, info, trace};
+use std::{fmt, thread};
 use std::time::Instant;
 
 use protobuf::Clear;
 use protobuf::Message;
-use sc2_proto::sc2api::{Request, RequestJoinGame, RequestSaveReplay, Response, Status};
-use websocket::result::WebSocketError;
-use websocket::Message as WMessage;
-use websocket::OwnedMessage;
+use sc2_proto::sc2api::{Request, Request_oneof_request, RequestJoinGame, RequestSaveReplay, Response, Status};
+use tokio_tungstenite::tungstenite::Message as TMessage;
 
 use super::messaging::{ChannelToGame, ToGameContent};
 use crate::config::Config;
@@ -21,15 +18,17 @@ use crate::sc2process::Process;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
-use std::thread;
 use std::thread::JoinHandle;
+use futures_util::{SinkExt, StreamExt};
+use tokio::net::TcpStream;
+use tokio_tungstenite::WebSocketStream;
 
 /// Player process, connection and details
 pub struct Player {
     /// SC2 process for this player
     pub(crate) process: Process,
     /// SC2 websocket connection
-    sc2_ws: Client,
+    sc2_ws: WebSocketStream<TcpStream>,
     /// Proxy connection to connected client
     connection: Client,
     /// Status of the connected sc2 process
@@ -48,26 +47,33 @@ pub struct Player {
 
 impl Player {
     /// Creates new player instance and initializes sc2 process for it
-    pub fn new(connection: Client, data: PlayerData) -> JoinHandle<Self> {
+    pub async fn new(connection: Client, data: PlayerData) -> JoinHandle<Self> {
         thread::spawn(|| {
-            let process = Process::new();
-            let sc2_ws = process.connect().expect("Could not connect");
-            Self {
-                process,
-                sc2_ws,
-                connection,
-                sc2_status: None,
-                game_loops: 0,
-                data,
-                frame_time: 0_f32,
-                player_id: None,
-                tags: Default::default(),
-            }
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.spawn(
+            async {
+                let process = Process::new();
+                let sc2_ws = process.connect().await.expect("Could not connect");
+                Self {
+                    process,
+                    sc2_ws,
+                    connection,
+                    sc2_status: None,
+                    game_loops: 0,
+                    data,
+                    frame_time: 0_f32,
+                    player_id: None,
+                    tags: Default::default(),
+                }
+            }).expect("COuld not something something") //todo:lol
         })
     }
-    pub fn new_no_thread(connection: Client, data: PlayerData) -> Self {
+    pub async fn new_no_thread(connection: Client, data: PlayerData) -> Self {
         let process = Process::new();
-        let sc2_ws = process.connect().expect("Could not connect");
+        let sc2_ws = process.connect().await.expect("Could not connect");
         Self {
             process,
             sc2_ws,
@@ -84,95 +90,95 @@ impl Player {
         &self.data.name
     }
     /// Send message to the client
-    fn client_send(&mut self, msg: WMessage) {
+    async fn client_send(&mut self, msg: TMessage) {
         trace!("Sending message to client");
-        self.connection.send_message(&msg).expect("Could not send");
+        self.connection.send_message(msg).await.expect("Could not send");
     }
 
     /// Send a protobuf response to the client
-    pub fn client_respond(&mut self, r: &Response) {
+    pub async fn client_respond(&mut self, r: &Response) {
         trace!(
             "Response to client: [{}]",
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
-        self.client_send(WMessage::binary(
+        self.client_send(TMessage::binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
-        ));
+        )).await;
     }
-    pub fn client_respond_raw(&mut self, r: &[u8]) {
+    pub async fn client_respond_raw(&mut self, r: &[u8]) {
         trace!(
             "Response to client: [{}]",
             format!("{:?}", r).chars().take(100).collect::<String>()
         );
-        self.client_send(WMessage::binary(r));
+        self.client_send(TMessage::binary(r)).await;
     }
 
     /// Receive a message from the client
     /// Returns None if the connection is already closed
     #[must_use]
-    fn client_recv(&mut self) -> Option<OwnedMessage> {
+    async fn client_recv(&mut self) -> Option<TMessage> {
         trace!("Waiting for a message from the client");
-        match self.connection.recv_message() {
+        match self.connection.recv_message().await? {
             Ok(msg) => {
                 trace!("Message received");
                 Some(msg)
             }
-            Err(WebSocketError::NoDataAvailable) => {
-                warn!(
-                    "Client {:?} closed connection unexpectedly (ws disconnect)",
-                    self.connection.peer_addr().expect("PeerAddr")
-                );
-                None
-            }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionReset => {
-                warn!(
-                    "Client {:?} closed connection unexpectedly (connection reset)",
-                    self.connection.peer_addr().expect("PeerAddr")
-                );
-                None
-            }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
-                warn!(
-                    "Client {:?} closed connection unexpectedly (connection abort)",
-                    self.connection.peer_addr().expect("PeerAddr")
-                );
-                None
-            }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == TimedOut => {
-                warn!(
-                    "Client {:?} stopped responding",
-                    self.connection.peer_addr().expect("PeerAddr")
-                );
-                None
-            }
-            Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {
-                warn!(
-                    "Client {:?} stopped responding",
-                    self.connection.peer_addr().expect("PeerAddr")
-                );
-                None
-            }
+            // Err(WebSocketError::NoDataAvailable) => {
+            //     warn!(
+            //         "Client {:?} closed connection unexpectedly (ws disconnect)",
+            //         self.connection.peer_addr().expect("PeerAddr")
+            //     );
+            //     None
+            // }
+            // Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionReset => {
+            //     warn!(
+            //         "Client {:?} closed connection unexpectedly (connection reset)",
+            //         self.connection.peer_addr().expect("PeerAddr")
+            //     );
+            //     None
+            // }
+            // Err(WebSocketError::IoError(ref e)) if e.kind() == ConnectionAborted => {
+            //     warn!(
+            //         "Client {:?} closed connection unexpectedly (connection abort)",
+            //         self.connection.peer_addr().expect("PeerAddr")
+            //     );
+            //     None
+            // }
+            // Err(WebSocketError::IoError(ref e)) if e.kind() == TimedOut => {
+            //     warn!(
+            //         "Client {:?} stopped responding",
+            //         self.connection.peer_addr().expect("PeerAddr")
+            //     );
+            //     None
+            // }
+            // Err(WebSocketError::IoError(ref e)) if e.kind() == WouldBlock => {
+            //     warn!(
+            //         "Client {:?} stopped responding",
+            //         self.connection.peer_addr().expect("PeerAddr")
+            //     );
+            //     None
+            // }
             Err(err) => panic!("Could not receive: {:?}", err),
         }
     }
 
     /// Get a protobuf request from the client
     /// Returns None if the connection is already closed
-    pub fn client_get_request(&mut self) -> Option<Request> {
-        match self.client_recv()? {
-            OwnedMessage::Binary(bytes) => {
+    pub async fn client_get_request(&mut self) -> Option<Request> {
+        match self.client_recv().await? {
+            TMessage::Binary(bytes) => {
                 let resp = Message::parse_from_bytes(&bytes).expect("Invalid protobuf message");
                 Some(resp)
             }
-            OwnedMessage::Close(_) => None,
+            TMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
 
-    pub fn client_get_request_raw(&mut self) -> Option<Vec<u8>> {
-        match self.client_recv()? {
-            OwnedMessage::Binary(bytes) => Some(bytes),
-            OwnedMessage::Close(_) => None,
+    pub async fn client_get_request_raw(&mut self) -> Option<Vec<u8>> {
+        match self.client_recv().await? {
+            TMessage::Binary(bytes) => Some(bytes),
+            TMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
@@ -180,58 +186,62 @@ impl Player {
     /// Send message to sc2
     /// Returns None if the connection is already closed
     #[must_use]
-    fn sc2_send(&mut self, msg: &OwnedMessage) -> Option<()> {
-        self.sc2_ws.send_message(msg).ok()
+    async fn sc2_send(&mut self, msg: TMessage) -> Option<()> {
+        self.sc2_ws.send(msg).await.ok()
     }
 
     /// Send protobuf request to sc2
     /// Returns None if the connection is already closed
-    pub fn sc2_request(&mut self, r: Request) -> Option<()> {
-        self.sc2_send(&OwnedMessage::Binary(
+    pub async fn sc2_request(&mut self, r: &Request) -> Option<()> {
+        self.sc2_send(TMessage::Binary(
             r.write_to_bytes().expect("Invalid protobuf message"),
-        ))
+        )).await
     }
-    pub fn sc2_request_raw(&mut self, r: Vec<u8>) -> Option<()> {
-        self.sc2_send(&OwnedMessage::Binary(r))
+    pub async fn sc2_request_raw(&mut self, r: Vec<u8>) -> Option<()> {
+        self.sc2_send(TMessage::Binary(r)).await
     }
 
     /// Wait and receive a protobuf request from sc2
     /// Returns None if the connection is already closed
-    pub fn sc2_recv(&mut self) -> Option<Response> {
-        match self.sc2_ws.recv_message().ok()? {
-            OwnedMessage::Binary(bytes) => {
+    pub async fn sc2_recv(&mut self) -> Option<Response> {
+        match self.sc2_ws.next().await?.ok()? {
+            TMessage::Binary(bytes) => {
                 Some(Message::parse_from_bytes(&bytes).expect("Invalid data"))
             }
-            OwnedMessage::Close(_) => None,
+            TMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
-    pub fn sc2_recv_raw(&mut self) -> Option<Vec<u8>> {
-        match self.sc2_ws.recv_message().ok()? {
-            OwnedMessage::Binary(bytes) => Some(bytes),
-            OwnedMessage::Close(_) => None,
+    pub async fn sc2_recv_raw(&mut self) -> Option<Vec<u8>> {
+        match self.sc2_ws.next().await?.ok()? {
+            TMessage::Binary(bytes) => Some(bytes),
+            TMessage::Close(_) => None,
             other => panic!("Expected binary message, got {:?}", other),
         }
     }
 
     /// Send a request to SC2 and return the reponse
     /// Returns None if the connection is already closed
-    pub fn sc2_query(&mut self, r: Request) -> Option<Response> {
-        self.sc2_request(r)?;
-        self.sc2_recv()
+    pub async fn sc2_query(&mut self, r: &Request) -> Option<Response> {
+        self.sc2_request(r).await?;
+        if let Request_oneof_request::step(x) = &r.request.as_ref().unwrap() {
+            println!("{:?}", x);
+            println!("{:?}", self.player_id);
+        }
+        self.sc2_recv().await
     }
-    pub fn sc2_query_raw(&mut self, r: Vec<u8>) -> Option<Vec<u8>> {
-        self.sc2_request_raw(r)?;
-        self.sc2_recv_raw()
+    pub async fn sc2_query_raw(&mut self, r: Vec<u8>) -> Option<Vec<u8>> {
+        self.sc2_request_raw(r).await?;
+        self.sc2_recv_raw().await
     }
     /// Saves replay to path
-    pub fn save_replay(&mut self, path: &str) -> bool {
+    pub async fn save_replay(&mut self, path: &str) -> bool {
         if path.is_empty() {
             return false;
         }
         let mut r = Request::new();
         r.set_save_replay(RequestSaveReplay::new());
-        if let Some(response) = self.sc2_query(r) {
+        if let Some(response) = self.sc2_query(&r).await {
             if response.has_save_replay() {
                 match File::create(&path) {
                     Ok(mut buffer) => {
@@ -258,7 +268,7 @@ impl Player {
     }
     /// Run handler communication loop
     #[must_use]
-    pub fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
+    pub async fn run(mut self, config: Config, mut gamec: ChannelToGame) -> Option<Self> {
         let mut debug_response = Response::new();
         debug_response.set_id(0);
         debug_response.set_status(Status::in_game);
@@ -283,8 +293,8 @@ impl Player {
         // }
 
         // Get request
-        while let Some(req_raw) = self.client_get_request_raw() {
-            req.merge_from_bytes(&req_raw).ok()?;
+        while let Some(req) = self.client_get_request().await {//todo:Change back to raw
+            // req.merge_from_bytes(&req_raw).ok()?;
 
             if start_timer {
                 frame_time += start_time.elapsed().as_secs_f32();
@@ -292,7 +302,7 @@ impl Player {
             // Check for debug requests
             if config.disable_debug() && req.has_debug() {
                 debug_response.set_id(req.get_id());
-                self.client_respond(&debug_response);
+                self.client_respond(&debug_response).await;
                 continue;
             } else if req.has_leave_game() {
                 surrender = true;
@@ -316,7 +326,7 @@ impl Player {
             }
 
             // Send request to SC2 and get response
-            response_raw = match self.sc2_query_raw(req_raw) {
+            response = match self.sc2_query(&req).await {
                 Some(d) => d,
                 None => {
                     error!("SC2 unexpectedly closed the connection");
@@ -327,7 +337,7 @@ impl Player {
                 }
             };
 
-            response.merge_from_bytes(&response_raw).ok()?;
+            // response.merge_from_bytes(&response_raw).ok()?;
             self.sc2_status = Some(response.get_status());
             if response.has_game_info() {
                 for pi in response.mut_game_info().mut_player_info().iter_mut() {
@@ -335,16 +345,16 @@ impl Player {
                         pi.race_actual = pi.race_requested;
                     }
                 }
-                response_raw = response.write_to_bytes().unwrap();
+                // response_raw = response.write_to_bytes().unwrap();
             }
 
             // Send SC2 response to client
-            self.client_respond_raw(&response_raw);
+            self.client_respond(&response).await;
             start_timer = true;
             start_time = Instant::now();
 
             if response.has_quit() {
-                self.save_replay(replay_path);
+                self.save_replay(replay_path).await;
                 self.frame_time = frame_time / self.game_loops as f32;
                 self.frame_time = if self.frame_time.is_nan() {
                     0_f32
@@ -380,12 +390,12 @@ impl Player {
                         frame_time: self.frame_time,
                         tags: self.tags.iter().cloned().collect(),
                     }));
-                    self.save_replay(replay_path);
+                    self.save_replay(replay_path).await;
                     self.process.kill();
                     return Some(self);
                 }
                 if self.game_loops > config.max_game_time() {
-                    self.save_replay(replay_path);
+                    self.save_replay(replay_path).await;
                     self.frame_time = frame_time / self.game_loops as f32;
                     self.frame_time = if self.frame_time.is_nan() {
                         0_f32
@@ -403,12 +413,12 @@ impl Player {
                     return Some(self);
                 }
             } else if surrender {
-                self.save_replay(replay_path);
+                self.save_replay(replay_path).await;
             }
 
-            clear_request(&mut req);
+            // clear_request(&mut req);
             clear_response(&mut response);
-            response_raw.clear();
+            // response_raw.clear();
 
             // if let Some(msg) = gamec.recv() {
             //     return match msg {
@@ -481,6 +491,7 @@ pub struct PlayerData {
     pub name: Option<String>,
     pub ifopts: sc2_proto::sc2api::InterfaceOptions,
 }
+
 impl PlayerData {
     pub fn from_join_request(req: RequestJoinGame, archon: bool) -> Self {
         Self {
@@ -498,6 +509,7 @@ impl PlayerData {
         }
     }
 }
+
 #[derive(Debug, Copy, Clone)]
 pub enum Visibility {
     Hidden,
@@ -505,6 +517,7 @@ pub enum Visibility {
     Visible,
     FullHidden,
 }
+
 impl Default for Visibility {
     fn default() -> Self {
         Visibility::Hidden

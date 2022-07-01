@@ -13,7 +13,6 @@ pub mod result;
 pub mod sc2;
 pub mod sc2process;
 pub mod server;
-pub use websocket;
 
 #[cfg(not(feature = "no-pyo3"))]
 #[pymodule]
@@ -22,7 +21,6 @@ fn rust_ac(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<server::PServer>()?;
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

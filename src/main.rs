@@ -11,7 +11,8 @@ pub mod sc2;
 mod sc2process;
 pub mod server;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let s = server::RustServer::new("127.0.0.1:8642");
-    s.run().join().expect("Could not join");
+    s.run().await.expect("Could not join");
 }

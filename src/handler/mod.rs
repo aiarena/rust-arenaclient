@@ -8,7 +8,6 @@ pub mod player;
 
 use crossbeam::channel::{self, Receiver, Sender, TryRecvError};
 use std::any::Any;
-use std::thread;
 
 use self::player::Player;
 
@@ -26,7 +25,7 @@ fn any_panic_to_string(panic_msg: Box<dyn Any>) -> String {
 /// Game thread handle
 pub struct Handle {
     /// Handle for the handler thread
-    handle: thread::JoinHandle<Vec<Player>>,
+    handle: tokio::task::JoinHandle<Vec<Player>>,
     /// Result connection receiver
     result_rx: Receiver<GameResult>,
     /// Message connection sender
@@ -62,19 +61,19 @@ impl Handle {
     /// Read result after the handler is over, and clean up the handler
     /// Also returns the handler result and a list of non-disconnected players
     /// Panics if handler is still running, i.e. `update` hasn't returned true yet
-    pub fn collect_result(self) -> Result<(GameResult, Vec<Player>), String> {
+    pub async fn collect_result(self) -> Result<(GameResult, Vec<Player>), String> {
         if let Some(r) = self.result {
             match r {
                 Ok(result) => {
                     let players = self
                         .handle
-                        .join()
+                        .await
                         .expect("Game crashed after sending a result");
                     Ok((result, players))
                 }
-                Err(()) => match self.handle.join() {
+                Err(()) => match self.handle.await {
                     Ok(_) => panic!("Game dropped result channel before ending"),
-                    Err(panic_msg) => Err(any_panic_to_string(panic_msg)),
+                    Err(panic_msg) => Err(any_panic_to_string(panic_msg.into_panic())),
                 },
             }
         } else {
@@ -89,7 +88,7 @@ pub fn spawn(game: Game) -> Handle {
     let (fr_msg_tx, fr_msg_rx) = channel::unbounded::<FromSupervisor>();
     let (to_msg_tx, to_msg_rx) = channel::unbounded::<ToSupervisor>();
 
-    let handle = thread::spawn(move || game.run(result_tx, fr_msg_rx, to_msg_tx));
+    let handle = tokio::spawn(async move{ game.run(result_tx, fr_msg_rx, to_msg_tx).await});
 
     Handle {
         handle,
