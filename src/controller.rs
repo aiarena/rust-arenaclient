@@ -533,7 +533,7 @@ pub fn create_supervisor_listener(
                                     .send(SupervisorAction::Ping(payload))
                                     .expect("Could not send SupervisorAction");
                             }
-                            _ => { }
+                            _ => {}
                         },
                         Err(Error::AlreadyClosed) => {
                             error!("Supervisor Error::AlreadyClosed");
@@ -557,8 +557,7 @@ pub fn create_supervisor_listener(
                             break;
                         }
                     }
-                }
-                else{
+                } else {
                     break;
                 }
             }
