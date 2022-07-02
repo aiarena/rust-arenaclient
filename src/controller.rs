@@ -18,6 +18,7 @@ use protobuf::Message;
 use sc2_proto::{self, sc2api::RequestJoinGame};
 use std::collections::HashMap;
 use tokio::net::TcpStream;
+use tokio::runtime::Runtime;
 use tokio_tungstenite::tungstenite::error::Error;
 use tokio_tungstenite::tungstenite::Message as TMessage;
 use tokio_tungstenite::WebSocketStream;
@@ -29,7 +30,7 @@ pub enum SupervisorAction {
     NoAction,
     Received,
     Config(String),
-    Ping,
+    Ping(Vec<u8>),
 }
 
 enum PlaylistAction {
@@ -111,11 +112,11 @@ impl Controller {
         self.game = None;
         self.connected_clients = 0;
     }
-    pub async fn send_pong(&mut self) {
+    pub async fn send_pong(&mut self, payload: Vec<u8>) {
         match &mut self.supervisor {
             Some(sender) => {
                 sender
-                    .send(TMessage::Pong(vec![0_u8]))
+                    .send(TMessage::Pong(payload))
                     .await
                     .expect("Could not send message to supervisor");
             }
@@ -495,66 +496,73 @@ pub enum RemoteUpdateStatus {
     NoAction,
 }
 
-pub async fn create_supervisor_listener(
+pub fn create_supervisor_listener(
     mut client_recv: SplitStream<WebSocketStream<TcpStream>>,
     sender: Sender<SupervisorAction>,
 ) {
-    tokio::spawn(async move {
-        loop {
-            if let Some(r_msg) = client_recv.next().await {
-                trace!("Message received from supervisor client");
-                match r_msg {
-                    Ok(msg) => match msg {
-                        TMessage::Text(data) => {
-                            if data == "Reset" {
-                                sender
-                                    .send(SupervisorAction::Quit)
-                                    .expect("Could not send SupervisorAction");
-                                break;
-                            } else if data == "Received" {
-                                sender
-                                    .send(SupervisorAction::Received)
-                                    .expect("Could not send SupervisorAction");
-                            } else if data.contains("Map") || data.contains("map") {
-                                sender
-                                    .send(SupervisorAction::Config(data))
-                                    .expect("Could not send config");
-                            } else if data == "Quit" {
-                                sender
-                                    .send(SupervisorAction::ForceQuit)
-                                    .expect("Could not send ForceQuit");
+    std::thread::spawn(move || {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            loop {
+                if let Some(r_msg) = client_recv.next().await {
+                    trace!("Message received from supervisor client");
+                    match r_msg {
+                        Ok(msg) => match msg {
+                            TMessage::Text(data) => {
+                                if data == "Reset" {
+                                    sender
+                                        .send(SupervisorAction::Quit)
+                                        .expect("Could not send SupervisorAction");
+                                    break;
+                                } else if data == "Received" {
+                                    sender
+                                        .send(SupervisorAction::Received)
+                                        .expect("Could not send SupervisorAction");
+                                } else if data.contains("Map") || data.contains("map") {
+                                    sender
+                                        .send(SupervisorAction::Config(data))
+                                        .expect("Could not send config");
+                                } else if data == "Quit" {
+                                    sender
+                                        .send(SupervisorAction::ForceQuit)
+                                        .expect("Could not send ForceQuit");
+                                }
                             }
-                        }
-                        TMessage::Ping(_) => {
+                            TMessage::Ping(payload) => {
+                                sender
+                                    .send(SupervisorAction::Ping(payload))
+                                    .expect("Could not send SupervisorAction");
+                            }
+                            _ => { }
+                        },
+                        Err(Error::AlreadyClosed) => {
+                            error!("Supervisor Error::AlreadyClosed");
                             sender
-                                .send(SupervisorAction::Ping)
-                                .expect("Could not send SupervisorAction");
+                                .send(SupervisorAction::ForceQuit)
+                                .expect("Could not send ForceQuit");
+                            break;
                         }
-                        _ => {}
-                    },
-                    Err(Error::AlreadyClosed) => {
-                        error!("Supervisor Error::AlreadyClosed");
-                        sender
-                            .send(SupervisorAction::ForceQuit)
-                            .expect("Could not send ForceQuit");
-                        break;
-                    }
-                    Err(Error::Capacity(e)) => {
-                        error!("{:?}", e);
-                        sender
-                            .send(SupervisorAction::ForceQuit)
-                            .expect("Could not send ForceQuit");
-                        break;
-                    }
-                    Err(e) => {
-                        error!("{:?}", e);
-                        sender
-                            .send(SupervisorAction::ForceQuit)
-                            .expect("Could not send ForceQuit");
-                        break;
+                        Err(Error::Capacity(e)) => {
+                            error!("{:?}", e);
+                            sender
+                                .send(SupervisorAction::ForceQuit)
+                                .expect("Could not send ForceQuit");
+                            break;
+                        }
+                        Err(e) => {
+                            error!("{:?}", e);
+                            sender
+                                .send(SupervisorAction::ForceQuit)
+                                .expect("Could not send ForceQuit");
+                            break;
+                        }
                     }
                 }
+                else{
+                    break;
+                }
             }
-        }
+            return;
+        });
     });
 }

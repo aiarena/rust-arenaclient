@@ -299,7 +299,7 @@ impl Player {
         let mut debug_response = Response::new();
         debug_response.set_id(0);
         debug_response.set_status(Status::in_game);
-        let timeout_secs = Duration::from_secs(40);
+        let timeout_secs = Duration::from_secs(config.max_frame_time as u64);
         let replay_path = config.replay_path();
         let mut start_timer = false;
         let mut frame_time = 0_f32;

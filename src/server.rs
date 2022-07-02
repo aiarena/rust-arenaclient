@@ -56,7 +56,7 @@ impl RustServer {
                         ClientType::Controller => {
                             let (ws_sender, ws_receiver) = client.stream.split();
                             controller.add_supervisor(ws_sender, sup_recv.to_owned());
-                            create_supervisor_listener(ws_receiver, sup_send.to_owned()).await;
+                            create_supervisor_listener(ws_receiver, sup_send.to_owned());
                             controller.send_message("{\"Status\": \"Connected\"}").await;
                         }
                     },
@@ -76,8 +76,8 @@ impl RustServer {
                             controller.send_message("{\"Config\": \"Received\"}").await;
                         }
                         SupervisorAction::ForceQuit => break,
-                        SupervisorAction::Ping => {
-                            controller.send_pong().await;
+                        SupervisorAction::Ping(payload) => {
+                            controller.send_pong(payload).await;
                         }
                         _ => {}
                     }
