@@ -21,6 +21,7 @@ use std::io::ErrorKind::{ConnectionAborted, ConnectionReset, TimedOut, WouldBloc
 use std::io::Write;
 use tokio::net::TcpStream;
 use tokio::time::timeout;
+use tokio_tungstenite::tungstenite::error::ProtocolError::ResetWithoutClosingHandshake;
 use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::WebSocketStream;
 
@@ -161,6 +162,13 @@ impl Player {
                 Err(Error::Io(e)) if e.kind() == WouldBlock => {
                     warn!(
                     "Client stopped responding\nAddress:{:?}\nPlayerId:{:?}\nName:{:?}\nError:{:?}",
+                    self.client_ws.peer_addr(), self.player_id, self.data.name,e
+                );
+                    return Err(anyhow::Error::new(e));
+                }
+                Err(Error::Protocol(e)) if e == ResetWithoutClosingHandshake => {
+                    warn!(
+                    "Client stopped responding\nAddress:{:?}\nPlayerId:{:?}\nName:{:?}\nError: {:?}",
                     self.client_ws.peer_addr(), self.player_id, self.data.name,e
                 );
                     return Err(anyhow::Error::new(e));
