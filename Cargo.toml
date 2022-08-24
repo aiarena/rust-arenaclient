@@ -41,7 +41,7 @@ anyhow = "1.0.58"
 version = "0.17.1"
 
 [dependencies.pyo3]
-version = "^0.16"
+version = "^0.17"
 optional = true
 features = ["auto-initialize"]
 
