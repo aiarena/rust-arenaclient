@@ -11,6 +11,7 @@ pub mod sc2;
 mod sc2process;
 pub mod server;
 use std::io::Write;
+pub mod errors;
 
 #[tokio::main]
 async fn main() {
