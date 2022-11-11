@@ -18,19 +18,19 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Cache cargo registry
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-registry-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo index
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-index-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo build
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
           path: |
             target
@@ -51,9 +51,9 @@ jobs:
         python-version: ['3.7', '3.8', '3.9', '3.10']
         os: [ubuntu-latest, windows-latest]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
+      uses: actions/setup-python@v4
       with:
           python-version: ${{ matrix.python-version }}
           
@@ -63,17 +63,17 @@ jobs:
         pip install maturin
         pip install -r rust_ac/requirements.txt
     - name: Cache cargo registry
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-registry-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo index
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-dev-index-${{ hashFiles('**/Cargo.lock') }}
     - name: Cache cargo build
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
           path: |
             target
@@ -91,7 +91,7 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -107,7 +107,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -129,9 +129,9 @@ jobs:
         python-version: ['3.7', '3.8', '3.9', '3.10']
         os: [ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -141,12 +141,12 @@ jobs:
           toolchain: stable
           override: true
       - name: Cache cargo registry
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
             path: ~/.cargo/registry
             key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-registry-${{ hashFiles('**/Cargo.lock') }}
       - name: Cache cargo index
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
             path: ~/.cargo/git
             key: ${{ runner.os }}-${{ steps.rustup.outputs.rustc_hash }}-index-${{ hashFiles('**/Cargo.lock') }}
@@ -176,7 +176,7 @@ jobs:
         if:  matrix.os != 'windows-latest'
         run: pip install target/wheels/rust_arenaclient*.whl
       
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         name: upload-wheel
         with:
          name: wheel-many-linux
