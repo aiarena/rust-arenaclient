@@ -40,12 +40,23 @@ class Supervisor:
         else:
             self._config: GameConfig = config
 
+    async def shutdown_request(self):
+        """
+        Connects to address with headers
+        """
+        headers = {"shutdown": "true"}
+        addr = self._parse_url()
+
+        session = ClientSession()
+        await session.ws_connect(addr, headers=headers)
+        return
+
     async def connect(self):
         """
         Connects to address with headers
         """
         ws, session = None, None
-        headers = {"Supervisor": "true"}
+        headers = {"supervisor": "true"}
         addr = self._parse_url()
         for i in range(60):
             await asyncio.sleep(1)

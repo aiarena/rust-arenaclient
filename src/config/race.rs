@@ -1,6 +1,6 @@
 use crate::sc2::Race;
 
-#[derive(PartialOrd, PartialEq, Debug)]
+#[derive(PartialOrd, PartialEq, Eq, Debug)]
 pub enum BotRace {
     NoRace = 0,
     Terran = 1,

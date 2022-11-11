@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 pub mod build_info;
 pub mod config;
 pub mod controller;
+pub mod errors;
 pub mod handler;
 pub mod maps;
 pub mod paths;

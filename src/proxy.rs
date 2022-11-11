@@ -1,10 +1,11 @@
 //! Proxy WebSocket receiver
 
+use crate::errors::proxy_error::ProxyError;
 use crate::server::ClientType;
 use crossbeam::channel::Sender;
 use futures_util::SinkExt;
 use futures_util::StreamExt;
-use log::info;
+use log::{error, info};
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio_tungstenite::tungstenite::handshake::server::{
@@ -56,11 +57,14 @@ impl Client {
 }
 
 /// Accept a new connection
-async fn get_connection(server: &mut TcpListener) -> Option<(ClientType, Client)> {
+async fn get_connection(server: &mut TcpListener) -> Result<(ClientType, Client), ProxyError> {
     let mut is_supervisor = false;
     let callback = |req: &Request, response: Response| {
         if req.headers().contains_key("supervisor") {
             is_supervisor = true;
+        }
+        if req.headers().contains_key("shutdown") {
+            return Err(ErrorResponse::new(Some("Shutdown Requested".to_string())));
         }
         Ok(response)
     };
@@ -77,31 +81,49 @@ async fn get_connection(server: &mut TcpListener) -> Option<(ClientType, Client)
     match server.accept().await {
         Ok((stream, peer)) => {
             // let peer = stream.peer_addr().expect("connected streams should have a peer address");
-            if let Ok(ws_stream) = accept_hdr_async_with_config(stream, callback, config).await {
-                let client = Client {
-                    stream: ws_stream,
-                    addr: peer,
-                };
-                return if is_supervisor {
-                    Some((ClientType::Controller, client))
-                } else {
-                    Some((ClientType::Bot, client))
-                };
+            match accept_hdr_async_with_config(stream, callback, config).await {
+                Ok(ws_stream) => {
+                    let client = Client {
+                        stream: ws_stream,
+                        addr: peer,
+                    };
+                    if is_supervisor {
+                        Ok((ClientType::Controller, client))
+                    } else {
+                        Ok((ClientType::Bot, client))
+                    }
+                }
+                Err(e) => {
+                    info!("1{:?}", e);
+                    Err(ProxyError::ShutdownRequest)
+                }
             }
-            None
         }
-        _ => None,
+        Err(e) => {
+            info!("2{:?}", e);
+            Err(ProxyError::AcceptError)
+        }
     }
 }
 
 /// Run the proxy server
-pub async fn run<A: ToSocketAddrs>(addr: A, channel_out: Sender<(ClientType, Client)>) -> ! {
+pub async fn run<A: ToSocketAddrs>(addr: A, channel_out: Sender<(ClientType, Client)>) {
     let mut server = TcpListener::bind(addr).await.expect("Unable to bind");
 
     loop {
-        if let Some((c_type, client)) = get_connection(&mut server).await {
-            info!("Connection accepted: {:?}", client.addr);
-            channel_out.send((c_type, client)).expect("Send failed");
+        match get_connection(&mut server).await {
+            Ok((c_type, client)) => {
+                info!("Connection accepted: {:?}", client.addr);
+                channel_out.send((c_type, client)).expect("Send failed");
+            }
+            Err(ProxyError::AcceptError) => {
+                error!("Could not accept incoming request");
+                break;
+            }
+            Err(ProxyError::ShutdownRequest) => {
+                info!("Shutdown requested");
+                break;
+            }
         }
     }
 }

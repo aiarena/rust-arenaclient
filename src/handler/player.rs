@@ -267,7 +267,7 @@ impl Player {
         r.set_save_replay(RequestSaveReplay::new());
         if let Some(response) = self.sc2_query(&r).await {
             if response.has_save_replay() {
-                match File::create(&path) {
+                match File::create(path) {
                     Ok(mut buffer) => {
                         let data: &[u8] = response.save_replay().data();
                         buffer
