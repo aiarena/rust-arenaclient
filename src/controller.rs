@@ -257,7 +257,7 @@ impl Controller {
     async fn client_join_game(&mut self, index: usize, req: RequestJoinGame) -> Option<()> {
         let ((client_name, client_race), client, old_req) = self.clients.remove(index);
         debug!("{} client_join_game", client_name);
-        if old_req != None {
+        if old_req.is_some() {
             error!("Client attempted to join a handler twice (dropping connection)");
             return None;
         }
@@ -382,7 +382,7 @@ impl Controller {
                         debug!("JoinGame from {:?}", self.clients[i].0);
                         let join_response = self.client_join_game(i, req).await;
 
-                        if join_response == None {
+                        if join_response.is_none() {
                             error!("Game creation / joining failed");
                         }
                     }

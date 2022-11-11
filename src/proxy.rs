@@ -87,11 +87,11 @@ async fn get_connection(server: &mut TcpListener) -> Result<(ClientType, Client)
                         stream: ws_stream,
                         addr: peer,
                     };
-                    return if is_supervisor {
+                    if is_supervisor {
                         Ok((ClientType::Controller, client))
                     } else {
                         Ok((ClientType::Bot, client))
-                    };
+                    }
                 }
                 Err(e) => {
                     info!("1{:?}", e);
