@@ -1,5 +1,6 @@
 //! Proxy WebSocket receiver
 
+use crate::errors::proxy_error::ProxyError;
 use crate::server::ClientType;
 use crossbeam::channel::Sender;
 use futures_util::SinkExt;
@@ -14,7 +15,6 @@ use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::protocol::{CloseFrame, WebSocketConfig};
 use tokio_tungstenite::tungstenite::{Error, Message};
 use tokio_tungstenite::{accept_hdr_async_with_config, WebSocketStream};
-use crate::errors::proxy_error::{ProxyError};
 
 pub struct HeaderHandler {
     is_supervisor: bool,
@@ -63,7 +63,7 @@ async fn get_connection(server: &mut TcpListener) -> Result<(ClientType, Client)
         if req.headers().contains_key("supervisor") {
             is_supervisor = true;
         }
-        if req.headers().contains_key("shutdown"){
+        if req.headers().contains_key("shutdown") {
             return Err(ErrorResponse::new(Some("Shutdown Requested".to_string())));
         }
         Ok(response)
@@ -82,7 +82,7 @@ async fn get_connection(server: &mut TcpListener) -> Result<(ClientType, Client)
         Ok((stream, peer)) => {
             // let peer = stream.peer_addr().expect("connected streams should have a peer address");
             match accept_hdr_async_with_config(stream, callback, config).await {
-                Ok(ws_stream) =>{
+                Ok(ws_stream) => {
                     let client = Client {
                         stream: ws_stream,
                         addr: peer,
@@ -97,14 +97,12 @@ async fn get_connection(server: &mut TcpListener) -> Result<(ClientType, Client)
                     info!("1{:?}", e);
                     Err(ProxyError::ShutdownRequest)
                 }
-
             }
-
         }
-        Err(e) =>  {
+        Err(e) => {
             info!("2{:?}", e);
             Err(ProxyError::AcceptError)
-        },
+        }
     }
 }
 

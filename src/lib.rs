@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 pub mod build_info;
 pub mod config;
 pub mod controller;
+pub mod errors;
 pub mod handler;
 pub mod maps;
 pub mod paths;
@@ -13,7 +14,6 @@ pub mod result;
 pub mod sc2;
 pub mod sc2process;
 pub mod server;
-pub mod errors;
 
 #[cfg(not(feature = "no-pyo3"))]
 #[pymodule]
