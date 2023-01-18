@@ -42,7 +42,7 @@ chrono = "0.4.22"
 version = "0.17.2"
 
 [dependencies.pyo3]
-version = "0.17.3"
+version = "0.18.0"
 optional = true
 features = ["auto-initialize"]
 
