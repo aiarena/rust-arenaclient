@@ -1,6 +1,6 @@
 # rust-arenaclient
 
-rust-arenaclient was created for [ai-arena](https://ai-arena.net/) to act as a proxy between 
+rust-arenaclient was created for [ai-arena](https://aiarena.net/) to act as a proxy between 
 bots and StarCraft II. It was originally written entirely in Python, 
 but due to performance concerns, was rewritten using Rust + [pyo3](https://github.com/pyo3/pyo3).
 
